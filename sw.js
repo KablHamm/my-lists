@@ -1,6 +1,6 @@
-/* My Lists service worker: caches the app shell so it opens offline.
+/* My Lists service worker: caches the app shell so it opens offline, and shows reminder notifications.
    Data requests (fetch() calls to GitHub) are never touched; list data lives in the page's localStorage copy and the private repo. */
-const CACHE = 'my-lists-1.2.0';   // keep in step with APP_VERSION in index.html
+const CACHE = 'my-lists-1.3.0';   // keep in step with APP_VERSION in index.html
 const SHELL = ['./', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
@@ -33,4 +33,32 @@ self.addEventListener('fetch', e => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
     })));
   }
+});
+
+/* Reminder pushes: the payload was encrypted for this device by the app; the browser has already decrypted it. */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = {}; }
+  e.waitUntil(self.registration.showNotification(d.title || 'My Lists', {
+    body: d.body || 'You have a reminder',
+    tag: d.tag || 'my-lists',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    data: { url: d.url || './' }
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  const task = new URL(target).searchParams.get('task');
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    for (const c of list) {
+      if (c.url.startsWith(self.registration.scope) && 'focus' in c) {
+        if (task) c.postMessage({ type: 'open-task', task });
+        return c.focus();
+      }
+    }
+    return self.clients.openWindow(target);
+  }));
 });
