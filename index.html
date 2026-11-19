@@ -339,6 +339,32 @@ function render(){
 function toText(){
   return S.lists.map(function(L){return (L.group?L.group+' / ':'')+L.name+'\n'+(L.tasks.length?L.tasks.map(function(t){return (t.done?'[x] ':'[ ] ')+t.t;}).join('\n'):'(empty)');}).join('\n\n');
 }
+/* Chiptune "level up" when a task is ticked off, made with Web Audio (no sound files).
+   allDone = that was the last open task in the list, so it plays a longer fanfare. */
+var audioCtx=null;
+function winSound(allDone){
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==='suspended')audioCtx.resume();
+    var c=audioCtx,t0=c.currentTime+0.01,out=c.createGain();
+    out.gain.value=0.18;out.connect(c.destination);
+    function note(f,start,len,type,vol){
+      var o=c.createOscillator(),g=c.createGain();
+      o.type=type||'square';o.frequency.setValueAtTime(f,t0+start);
+      g.gain.setValueAtTime(0,t0+start);
+      g.gain.linearRampToValueAtTime(vol||1,t0+start+0.005);
+      g.gain.exponentialRampToValueAtTime(0.001,t0+start+len);
+      o.connect(g);g.connect(out);o.start(t0+start);o.stop(t0+start+len+0.02);
+    }
+    // quick rising arpeggio C6 E6 G6 C7, with a soft triangle "sparkle" an octave up
+    var arp=[1046.5,1318.5,1568,2093];
+    arp.forEach(function(f,i){note(f,i*0.055,0.12,'square',0.8);note(f*2,i*0.055+0.02,0.08,'triangle',0.35);});
+    if(allDone){
+      // list cleared: a little victory fanfare on top
+      [[1568,0.26,0.1],[1568,0.37,0.1],[2093,0.48,0.45]].forEach(function(n){note(n[0],n[1],n[2],'square',0.9);note(n[0]/2,n[1],n[2],'triangle',0.6);});
+    }
+  }catch(err){}
+}
 document.addEventListener('click',function(e){
   var b=e.target.closest('[data-act]');if(!b)return;
   var a=b.getAttribute('data-act'),id=b.getAttribute('data-id'),lid=b.getAttribute('data-list');
@@ -346,7 +372,7 @@ document.addEventListener('click',function(e){
   if(a==='signout'){cloud.confirmOut=true;render();return;}
   if(a==='signoutno'){cloud.confirmOut=false;render();return;}
   if(a==='signoutyes'){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;cloud.status='';cloud.needImport=false;window.Cloud.signOut();return;}
-  if(a==='toggle'){var t=L.tasks.find(function(x){return x.id===id;});t.done=!t.done;save();render();return;}
+  if(a==='toggle'){var t=L.tasks.find(function(x){return x.id===id;});t.done=!t.done;if(t.done)winSound(openCount(L)===0);save();render();return;}
   if(a==='pick'){cur=id;q='';confirmDel=false;drawer=false;exportText=null;render();return;}
   if(a==='drawer'){drawer=!drawer;render();return;}
   if(a==='edit'){editing=id;render();return;}
