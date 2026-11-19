@@ -92,6 +92,19 @@ h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing
 .task.done .tx{color:var(--muted);text-decoration:line-through}
 .task .note{display:block;font-size:14px;color:var(--muted);white-space:pre-wrap;margin-top:2px;text-decoration:none}
 .task .src{display:block;font-size:12px;color:var(--muted)}
+.due{display:inline-block;margin-top:3px;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--bg);color:var(--muted);text-decoration:none}
+.due.today{color:var(--accent)}
+.due.over{color:var(--danger)}
+.task.done .due{display:none}
+.duehead{font:600 13px var(--font-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 8px}
+.duehead.over{color:var(--danger)}
+.editbox .when{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.editbox .when label{flex:1;min-width:130px}
+.editbox input[type=date],.editbox input[type=time]{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.editbox .chk{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
+.item.duebtn{font-weight:600;margin-bottom:4px}
+.item .ct.hot{color:var(--danger);font-weight:600}
+.item.on .ct.hot{color:var(--accent-ink)}
 .task .row-acts{display:flex;gap:2px;flex:none}
 .task.dragging{position:relative;z-index:2;box-shadow:0 4px 16px rgba(0,0,0,.18);border-radius:10px}
 .grip{border:0;background:none;color:var(--muted);padding:0 4px;margin:0 -8px 0 -8px;font-size:18px;line-height:1.25;cursor:grab;touch-action:none;flex:none;user-select:none;-webkit-user-select:none}
@@ -157,7 +170,7 @@ h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing
 <script id="code">
 (function(){
 /* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
-var APP_VERSION='1.2.0';
+var APP_VERSION='1.3.0';
 var S=JSON.parse(document.getElementById('state').textContent);
 var LSK='my-lists-state-v1';
 try{var l=JSON.parse(localStorage.getItem(LSK)||'null'); if(l&&l.rev>S.rev) S=l;}catch(e){}
@@ -172,7 +185,7 @@ function lsSave(){try{localStorage.setItem(LSK,JSON.stringify(S));}catch(e){}}
 
 function save(){
   S.rev=(S.rev||0)+1; lsSave(); setDirty(true);
-  if(cloud.user){cloud.status='Saving…';paintStatus();clearTimeout(pushTimer);pushTimer=setTimeout(pushNow,1500);}
+  if(cloud.user){cloud.status='Saving…';paintStatus();clearTimeout(pushTimer);pushTimer=setTimeout(pushNow,1500);scheduleRem();}
 }
 function paintStatus(){var e=document.getElementById('status');if(e)e.textContent=cloud.status;}
 
@@ -260,7 +273,7 @@ window.Cloud=(function(){
         ls(TKK,tok);ls(GHK,JSON.stringify(cfg));if(authCb)authCb(cfg);
       });
     },
-    signOut:function(){[TKK,LSK,DIRTYK,SHAK,KEYK,LOCKK,FAILK].forEach(function(k){ls(k,null);});keyCache=null;if(authCb)authCb(null);},
+    signOut:function(){[TKK,LSK,DIRTYK,SHAK,KEYK,LOCKK,FAILK,'my-lists-device'].forEach(function(k){ls(k,null);});keyCache=null;if(authCb)authCb(null);},
     /* resolves null when the file does not exist (at ref), else {state, sha, plain} */
     get:function(ref){
       return req('GET',fileUrl(getCfg())+(ref?'?ref='+encodeURIComponent(ref):'')).then(function(r){
@@ -281,6 +294,19 @@ window.Cloud=(function(){
         if(r.status===409||r.status===422)return {conflict:true};
         return json(r).then(function(j){return {sha:j.content.sha};});
       });
+    },
+    /* any other file in the data repo (used for reminders.json): null or {text, sha} */
+    getRaw:function(path){
+      var c=getCfg();
+      return req('GET',repoUrl(c)+'/contents/'+enc(path)).then(function(r){if(r.status===404)return null;return json(r).then(function(j){return {text:b64dec(j.content),sha:j.sha};});});
+    },
+    putRaw:function(path,text,sha,msg){
+      var c=getCfg(),body={message:msg,content:b64enc(text)};if(sha)body.sha=sha;
+      return req('PUT',repoUrl(c)+'/contents/'+enc(path),body).then(function(r){if(r.status===409||r.status===422)return {conflict:true};return json(r).then(function(j){return {sha:j.content.sha};});});
+    },
+    /* latest run of the reminder sender (a GitHub Actions workflow in the public site repo) */
+    lastRun:function(ownerRepo){
+      return req('GET','/repos/'+enc(ownerRepo)+'/actions/workflows/reminders.yml/runs?per_page=1').then(function(r){if(r.status===404)return null;return json(r);}).then(function(j){return j&&j.workflow_runs&&j.workflow_runs[0]||(j?{none:true}:null);});
     },
     /* saved versions of the file, newest first */
     commits:function(){var c=getCfg();return req('GET',repoUrl(c)+'/commits?per_page=40&path='+encodeURIComponent(c.path)).then(json);},
@@ -383,6 +409,172 @@ function bioCheck(id){
   return navigator.credentials.get({publicKey:{challenge:rand(32),allowCredentials:[{type:'public-key',id:u8(id)}],userVerification:'required',timeout:60000}})
     .then(function(a){return !!a&&(new Uint8Array(a.response.authenticatorData)[32]&4)!==0;});   /* UV flag: the person was verified */
 }
+/* ---- push reminders ----
+   Each device that turns notifications on subscribes with the browser's push service and is listed in
+   reminders.json (next to lists.json in the private repo). For every upcoming reminder the app writes one
+   item per device: the send time and the notification ALREADY ENCRYPTED for that device (Web Push aes128gcm,
+   RFC 8291). A scheduled GitHub Actions job in the public site repo sends due items and removes them, so it
+   never sees any task text. The job signs requests with the VAPID private key (an Actions secret). */
+var VAPID_PUBLIC='BDdcvBRLCSQL7V0mDBEHj9jvpbZpWFxblwGv_dAff8L2Bq2S5WZGl-s7f-Fw54A58pAR9pFXM-gYtfKydup_GHE';
+var DEVK='my-lists-device';   /* {id, endpoint} of this device's subscription */
+var push={busy:false, err:'', file:null, run:undefined, runErr:''};
+function b64url(u){return b64u8(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+function unb64url(s){s=String(s).replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return u8(s);}
+function concatU8(){var n=0,i,o=0;for(i=0;i<arguments.length;i++)n+=arguments[i].length;var out=new Uint8Array(n);for(i=0;i<arguments.length;i++){out.set(arguments[i],o);o+=arguments[i].length;}return out;}
+function hkdf(salt,ikm,info,len){
+  return crypto.subtle.importKey('raw',ikm,'HKDF',false,['deriveBits'])
+    .then(function(k){return crypto.subtle.deriveBits({name:'HKDF',hash:'SHA-256',salt:salt,info:info},k,len*8);}).then(function(b){return new Uint8Array(b);});
+}
+/* Web Push message encryption (RFC 8291 / RFC 8188, aes128gcm, one record) -> base64 body */
+function pushEncrypt(dev,text){
+  var te=new TextEncoder(),ua=unb64url(dev.p256dh),auth=unb64url(dev.auth),salt=rand(16),kp,asPub;
+  return crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits'])
+    .then(function(k){kp=k;return crypto.subtle.exportKey('raw',k.publicKey);})
+    .then(function(raw){asPub=new Uint8Array(raw);return crypto.subtle.importKey('raw',ua,{name:'ECDH',namedCurve:'P-256'},false,[]);})
+    .then(function(uaKey){return crypto.subtle.deriveBits({name:'ECDH','public':uaKey},kp.privateKey,256);})
+    .then(function(ecdh){return hkdf(auth,new Uint8Array(ecdh),concatU8(te.encode('WebPush: info\0'),ua,asPub),32);})
+    .then(function(ikm){return Promise.all([hkdf(salt,ikm,te.encode('Content-Encoding: aes128gcm\0'),16),hkdf(salt,ikm,te.encode('Content-Encoding: nonce\0'),12)]);})
+    .then(function(r){return crypto.subtle.importKey('raw',r[0],'AES-GCM',false,['encrypt']).then(function(k){return crypto.subtle.encrypt({name:'AES-GCM',iv:r[1]},k,concatU8(te.encode(text),new Uint8Array([2])));});})
+    .then(function(ct){var hdr=new Uint8Array(21);hdr.set(salt,0);new DataView(hdr.buffer).setUint32(16,4096);hdr[20]=65;return b64u8(concatU8(hdr,asPub,new Uint8Array(ct)));});
+}
+function remPath(){return getCfg().path.replace(/[^\/]*$/,'')+'reminders.json';}
+function svcRepo(){var c=getCfg(),seg=location.pathname.split('/').filter(Boolean)[0]||'my-lists';return (defaultOwner()||c.owner)+'/'+seg;}
+function deviceName(){var u=navigator.userAgent;return /iPhone/.test(u)?'iPhone':/iPad/.test(u)?'iPad':/Android/.test(u)?'Android':/Windows/.test(u)?'Windows PC':/Mac/.test(u)?'Mac':'Device';}
+function myDevice(){return lsJson(DEVK);}
+/* the reminders this device's lists ask for: [{tid, at, body}] (future only) */
+function wantedReminders(){
+  var now=Date.now(),hide=!!(S.prefs&&S.prefs.pushHide),out=[];
+  S.lists.forEach(function(L){L.tasks.forEach(function(t){
+    if(!t.rem||!t.d||t.done)return;var at=dueAt(t);if(at<=now)return;
+    out.push({tid:t.id,at:at,body:hide?'You have a reminder':(t.t.length>150?t.t.slice(0,148)+'…':t.t)});
+  });});
+  return out.sort(function(a,b){return a.at-b.at;}).slice(0,200);
+}
+/* fingerprint of what the file should hold; salted with this account's secret key so it reveals nothing */
+function remPrint(want,file){
+  var info=getKeyInfo(),src=JSON.stringify([want,Object.keys(file.devices||{}).sort(),info?info.k:'']);
+  return crypto.subtle.digest('SHA-256',new TextEncoder().encode(src)).then(function(h){return b64url(new Uint8Array(h)).slice(0,32);});
+}
+var remTimer=null, remBusy=null;
+function scheduleRem(){clearTimeout(remTimer);remTimer=setTimeout(function(){remUpdate().catch(function(){});},3000);}
+/* read reminders.json, apply `opts.mutate`, rebuild the encrypted items if anything changed, save (retrying on conflicts) */
+function remUpdate(opts){
+  opts=opts||{};
+  if(!cloud.user||!getKeyInfo()||cloud.pass)return Promise.resolve('off');
+  if(remBusy)return remBusy.then(function(){return remUpdate(opts);},function(){return remUpdate(opts);});
+  var p=(function attempt(tries){
+    var path=remPath(),f0,file;
+    return window.Cloud.getRaw(path).then(function(f){
+      f0=f;try{file=f?JSON.parse(f.text):null;}catch(e){file=null;}
+      file=file&&typeof file==='object'?file:{};
+      file.v=1;file.note='Push reminders for My Lists. Each payload is encrypted for one device; "at" is when to send it.';
+      file.devices=file.devices||{};file.items=file.items||[];
+      return opts.mutate?opts.mutate(file):null;
+    }).then(function(){
+      var want=wantedReminders(),devs=Object.keys(file.devices);
+      return remPrint(want,file).then(function(fp){
+        push.file=file;
+        if(!opts.mutate&&file.fp===fp)return 'same';
+        if(!f0&&!devs.length)return 'none';
+        /* keep items already due but not sent yet (the job runs every few minutes): tests, and reminders whose task still wants them */
+        var now=Date.now(),still={};
+        S.lists.forEach(function(L){L.tasks.forEach(function(t){if(t.rem&&t.d&&!t.done)still[t.id+'@'+dueAt(t)]=1;});});
+        var keep=file.items.filter(function(it){return file.devices[it.dev]&&it.at<=now&&it.at>now-864e5&&(/^test-/.test(it.id)||still[it.tid+'@'+it.at]);});
+        var jobs=[];
+        want.forEach(function(w){devs.forEach(function(d){
+          jobs.push(pushEncrypt(file.devices[d],JSON.stringify({title:'My Lists',body:w.body,tag:'task-'+w.tid,url:'./?task='+w.tid}))
+            .then(function(pl){return {id:uid()+uid(),tid:w.tid,at:w.at,dev:d,payload:pl};}));
+        });});
+        return Promise.all(jobs).then(function(items){
+          file.items=keep.concat(items).sort(function(a,b){return a.at-b.at;});file.fp=fp;
+          return window.Cloud.putRaw(path,JSON.stringify(file,null,1),f0&&f0.sha,opts.msg||'Update reminders');
+        }).then(function(r){
+          if(r.conflict){if(tries<3)return attempt(tries+1);throw codeErr('conflict');}
+          return 'saved';
+        });
+      });
+    });
+  })(0);
+  remBusy=p.then(function(v){remBusy=null;return v;},function(e){remBusy=null;throw e;});
+  return remBusy;
+}
+function pushSupported(){return 'serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window;}
+function isIOS(){return /iPhone|iPad/.test(navigator.userAgent);}
+function standalone(){return (window.matchMedia&&matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;}
+function subscribePush(){
+  var fake=lsJson('my-lists-test-sub');   /* test hook: a pre-made subscription (used by the automated tests) */
+  if(fake)return Promise.resolve(fake);
+  return Notification.requestPermission().then(function(p){
+    if(p!=='granted')throw codeErr('denied');
+    return navigator.serviceWorker.ready;
+  }).then(function(reg){
+    return reg.pushManager.getSubscription().then(function(s){return s||reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:unb64url(VAPID_PUBLIC)});});
+  }).then(function(s){var j=s.toJSON();return {endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth};});
+}
+function enablePush(){
+  push.busy=true;push.err='';render();
+  subscribePush().then(function(sub){
+    var me=myDevice(),id=me&&me.id||('d'+uid());
+    return remUpdate({msg:'Add a device for reminders',mutate:function(file){
+      file.devices[id]={endpoint:sub.endpoint,p256dh:sub.p256dh,auth:sub.auth,name:deviceName(),added:new Date().toISOString()};
+    }}).then(function(){ls(DEVK,JSON.stringify({id:id,endpoint:sub.endpoint}));});
+  }).then(function(){push.busy=false;render();showToast('Notifications are on for this device');})
+  .catch(function(err){
+    var c=err&&err.code;push.busy=false;
+    if(c==='bad-token'||c==='need-pass')return syncFail(err);
+    push.err=c==='denied'?'Notifications are blocked for this app. Allow them in your phone or browser settings, then try again.':c==='network'?'Cannot reach GitHub. Try again when you are online.':'Could not turn on notifications ('+(c||(err&&err.message)||'error')+').';
+    render();
+  });
+}
+function removeDevice(id){
+  push.busy=true;push.err='';render();
+  var me=myDevice(),mine=me&&me.id===id;
+  remUpdate({msg:'Remove a device from reminders',mutate:function(file){delete file.devices[id];file.items=file.items.filter(function(it){return it.dev!==id;});}})
+  .then(function(){
+    if(mine){ls(DEVK,null);if(!lsJson('my-lists-test-sub')&&pushSupported())return navigator.serviceWorker.ready.then(function(r){return r.pushManager.getSubscription();}).then(function(s){return s&&s.unsubscribe();}).catch(function(){});}
+  }).then(function(){push.busy=false;render();showToast(mine?'Notifications are off for this device':'Device removed');})
+  .catch(function(err){push.busy=false;push.err='Could not update reminders ('+(err&&err.code)+').';render();});
+}
+function testPush(){
+  var me=myDevice();if(!me)return;
+  push.busy=true;push.err='';render();
+  remUpdate({msg:'Test reminder',mutate:function(file){
+    var dev=file.devices[me.id];if(!dev)throw codeErr('no-device');
+    return pushEncrypt(dev,JSON.stringify({title:'My Lists',body:'Test notification: reminders are working.',tag:'test',url:'./'}))
+      .then(function(pl){file.items.push({id:'test-'+uid(),at:Date.now(),dev:me.id,payload:pl});});
+  }}).then(function(){push.busy=false;render();showToast('Test queued: it should arrive within about 5 to 30 minutes');})
+  .catch(function(err){push.busy=false;var c=err&&err.code;push.err=c==='no-device'?'This device is not in the reminders list any more. Turn notifications off and on again.':'Could not queue the test ('+c+').';render();});
+}
+function loadPushInfo(){
+  push.run=undefined;push.runErr='';
+  window.Cloud.getRaw(remPath()).then(function(f){try{push.file=f?JSON.parse(f.text):{devices:{},items:[]};}catch(e){push.file={devices:{},items:[]};}if(view==='settings')render();}).catch(function(){});
+  window.Cloud.lastRun(svcRepo()).then(function(r){push.run=r;if(view==='settings')render();}).catch(function(err){push.run=null;push.runErr=err&&err.code;if(view==='settings')render();});
+}
+function ago(iso){var m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago';}
+function remindersCard(){
+  var me=myDevice(),f=push.file,devs=f&&f.devices||{},ids=Object.keys(devs),onHere=!!(me&&devs[me.id]),prefs=S.prefs||{};
+  var h='<section class="card" id="reminders-card"><h2>Reminders</h2>'+
+    '<p>Give a task a due date with Edit. <strong>Add to calendar</strong> makes an event your phone\'s calendar will alert you for. Notifications come from a GitHub job that checks every 5 minutes, and can arrive up to about 30 minutes late.</p>'+
+    '<label class="row"><input type="checkbox" id="set-calnames" data-act="setcalnames"'+(prefs.calNames?' checked':'')+'> Use the task name as the calendar event title (otherwise "My Lists reminder")</label>'+
+    '<label class="row"><input type="checkbox" id="set-pushhide" data-act="setpushhide"'+(prefs.pushHide?' checked':'')+'> Hide task names in notifications (they show on the lock screen)</label>';
+  if(!pushSupported())h+='<p class="small">'+(isIOS()&&!standalone()?'On iPhone, add My Lists to your Home Screen first (Share, then Add to Home Screen), open it from there, then turn on notifications here.':'This browser cannot receive notifications.')+'</p>';
+  else if(isIOS()&&!standalone()&&!onHere)h+='<p class="small">On iPhone, notifications only work in the Home Screen app. Add My Lists to your Home Screen, open it from there, and turn them on.</p>';
+  if(f===null)h+='<p class="small">Loading…</p>';
+  else{
+    h+='<p>This device: <strong>'+(onHere?'notifications on':'notifications off')+'</strong></p><div class="btns">'+
+      (onHere?'<button class="btn" data-act="pushtest"'+(push.busy?' disabled':'')+'>Send a test notification</button><button class="btn" data-act="pushoff" data-id="'+me.id+'"'+(push.busy?' disabled':'')+'>Turn off on this device</button>'
+             :(pushSupported()?'<button class="btn primary" id="push-on" data-act="pushon"'+(push.busy?' disabled':'')+'>'+(push.busy?'Turning on…':'Turn on notifications on this device')+'</button>':''))+'</div>';
+    if(ids.length)h+='<p class="small">Devices getting notifications:</p><ul class="vers" id="push-devices">'+ids.map(function(id){var d=devs[id];
+      return '<li><span class="when">'+esc(d.name||'Device')+(me&&me.id===id?' (this device)':'')+'<small>added '+esc(fmtDate(d.added))+'</small></span>'+(me&&me.id===id?'':'<button class="btn" data-act="pushoff" data-id="'+esc(id)+'">Remove</button>')+'</li>';}).join('')+'</ul>';
+    var pending=(f.items||[]).filter(function(it){return it.at>Date.now();}).length;
+    if(ids.length)h+='<p class="small">'+pending+' notification'+(pending===1?'':'s')+' scheduled.</p>';
+  }
+  if(push.err)h+='<p class="err">'+esc(push.err)+'</p>';
+  var r=push.run;
+  h+='<p class="small" id="push-service">Reminder service: '+(r===undefined?'checking…':r===null?(push.runErr?'could not check ('+esc(push.runErr)+')':'not set up yet'):r.none?'set up, has not run yet':
+     (r.status!=='completed'?'running now':r.conclusion==='success'?'working (last check '+ago(r.updated_at||r.created_at)+')':'last check failed '+ago(r.updated_at||r.created_at)+'. The DATA_TOKEN secret may have expired.'))+'</p>';
+  return h+'</section>';
+}
 function unlock(){locked=false;lockErr='';ls(FAILK,null);cloud.confirmOut=false;render();}
 function lockFail(){
   var f=lsJson(FAILK)||{n:0,until:0}; f.n++;
@@ -435,6 +627,62 @@ function sideHtml(){
   });
   return out;
 }
+/* ---- due dates: task.d = 'YYYY-MM-DD', task.tm = 'HH:MM' (optional), task.rem = 1 for a push reminder ---- */
+function pad(n){return (n<10?'0':'')+n;}
+function dayStr(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+function todayStr(){return dayStr(new Date());}
+function tomorrowStr(){var n=new Date();return dayStr(new Date(n.getFullYear(),n.getMonth(),n.getDate()+1));}
+function parseDay(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+/* when it is due (ms); date-only tasks count as 09:00 for reminders */
+function dueAt(t){if(!t.d)return null;var d=parseDay(t.d),h=9,m=0;if(t.tm){var q=t.tm.split(':');h=+q[0];m=+q[1];}d.setHours(h,m,0,0);return d.getTime();}
+function dueKind(t){
+  if(!t.d||t.done)return null;
+  var td=todayStr();
+  if(t.d<td||(t.d===td&&t.tm&&dueAt(t)<Date.now()))return 'over';
+  return t.d===td?'today':'later';
+}
+function fmtDay(s){return parseDay(s).toLocaleDateString([], {weekday:'short',day:'numeric',month:'short'});}
+function dueLabel(t){var day=t.d===todayStr()?'Today':t.d===tomorrowStr()?'Tomorrow':fmtDay(t.d);return day+(t.tm?' '+t.tm:'');}
+function dueChip(t){
+  var k=dueKind(t);if(!k)return '';
+  return '<span class="due '+k+'">'+(k==='over'?'Overdue: ':'Due ')+esc(dueLabel(t))+(t.rem?' · reminder':'')+'</span>';
+}
+function dueTasks(){var r=[];S.lists.forEach(function(L){L.tasks.forEach(function(t){if(t.d&&!t.done)r.push([L,t]);});});return r.sort(function(a,b){return dueAt(a[1])-dueAt(b[1]);});}
+function hotCount(){return dueTasks().filter(function(r){var k=dueKind(r[1]);return k==='over'||k==='today';}).length;}
+function dueHtml(){
+  var all=dueTasks(),td=todayStr(),n=new Date(),wk=dayStr(new Date(n.getFullYear(),n.getMonth(),n.getDate()+7));
+  var groups=[['over','Overdue',[]],['today','Today',[]],['week','Next 7 days',[]],['later','Later',[]]];
+  all.forEach(function(r){var t=r[1],k=dueKind(t);groups[k==='over'?0:k==='today'?1:t.d<=wk?2:3][2].push(r);});
+  var h='<div class="top"><button class="btn menu" data-act="drawer" aria-label="Show lists">Lists</button><h1>Due</h1></div><p class="meta">'+all.length+' open task'+(all.length===1?'':'s')+' with a due date</p>';
+  if(!all.length)return h+'<div class="tasks"><div class="empty">Nothing has a due date yet. Edit a task to give it one.</div></div>';
+  groups.forEach(function(g){if(g[2].length)h+='<div class="duehead '+g[0]+'">'+g[1]+' ('+g[2].length+')</div><ul class="tasks">'+g[2].map(function(r){return taskHtml(r[0],r[1],true);}).join('')+'</ul>';});
+  return h;
+}
+/* calendar event (.ics) so the phone's own calendar sounds the alert */
+function icsText(t,L){
+  function esc2(s){return String(s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n');}
+  function fold(line){var out='';while(line.length>73){out+=line.slice(0,73)+'\r\n ';line=line.slice(73);}return out+line;}
+  var named=!!(S.prefs&&S.prefs.calNames),title=named?t.t:'My Lists reminder',d=t.d.replace(/-/g,''),now=new Date(),lines;
+  var stamp=now.getUTCFullYear()+pad(now.getUTCMonth()+1)+pad(now.getUTCDate())+'T'+pad(now.getUTCHours())+pad(now.getUTCMinutes())+pad(now.getUTCSeconds())+'Z';
+  if(t.tm){
+    var st=new Date(dueAt(t)),en=new Date(dueAt(t)+30*60000);
+    function loc(x){return dayStr(x).replace(/-/g,'')+'T'+pad(x.getHours())+pad(x.getMinutes())+'00';}
+    lines=['DTSTART:'+loc(st),'DTEND:'+loc(en)];
+  } else {
+    var nx=parseDay(t.d);nx.setDate(nx.getDate()+1);
+    lines=['DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+dayStr(nx).replace(/-/g,'')];
+  }
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//My Lists//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',
+    'UID:'+t.id+'@my-lists','DTSTAMP:'+stamp].concat(lines,[
+    'SUMMARY:'+esc2(title),'DESCRIPTION:'+esc2(named?'From My Lists ('+L.name+')':'Open My Lists to see what is due.'),
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+esc2(title),'TRIGGER'+(t.tm?':-PT0M':':PT9H'),'END:VALARM',
+    'END:VEVENT','END:VCALENDAR']).map(fold).join('\r\n')+'\r\n';
+}
+function downloadFile(name,text,type){
+  var url=URL.createObjectURL(new Blob([text],{type:type})),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},60000);
+}
 function itemHtml(L,sub){
   return '<button class="item'+(sub?' sub':'')+(L.id===cur&&!q&&view==='lists'?' on':'')+'" data-act="pick" data-id="'+L.id+'"><span class="nm">'+esc(L.name)+'</span><span class="ct">'+(openCount(L)||'')+'</span></button>';
 }
@@ -443,13 +691,16 @@ function taskHtml(L,t,showSrc,grip){
     return '<li class="task" data-id="'+t.id+'"><div class="editbox">'+
       '<input class="edit" id="edit-input" value="'+esc(t.t)+'" data-id="'+t.id+'" aria-label="Task">'+
       '<textarea class="edit" id="edit-note" placeholder="Notes (optional)" aria-label="Notes">'+esc(t.n||'')+'</textarea>'+
+      '<div class="when"><label>Due date<input type="date" id="edit-date" value="'+esc(t.d||'')+'"></label><label>Time (optional)<input type="time" id="edit-time" value="'+esc(t.tm||'')+'"></label></div>'+
+      '<label class="chk"><input type="checkbox" id="edit-rem"'+(t.rem?' checked':'')+'> Send a notification when it is due'+(t.tm?'':' (9:00 if no time)')+'</label>'+
       '<label>List<select id="edit-move">'+S.lists.map(function(x){return '<option value="'+x.id+'"'+(x.id===L.id?' selected':'')+'>'+esc(listLabel(x))+'</option>';}).join('')+'</select></label>'+
-      '<div class="btns"><button class="btn primary" data-act="saveedit" data-list="'+L.id+'" data-id="'+t.id+'">Save</button><button class="btn" data-act="canceledit">Cancel</button></div></div></li>';
+      '<p class="err" id="edit-err" role="alert"></p>'+
+      '<div class="btns"><button class="btn primary" data-act="saveedit" data-list="'+L.id+'" data-id="'+t.id+'">Save</button><button class="btn" data-act="ics" data-list="'+L.id+'" data-id="'+t.id+'">Add to calendar</button><button class="btn" data-act="canceledit">Cancel</button></div></div></li>';
   }
   return '<li class="task'+(t.done?' done':'')+'" data-id="'+t.id+'">'+
     (grip?'<button class="grip" data-id="'+t.id+'" aria-label="Move task: drag, or use the up and down arrow keys" title="Drag to reorder">⠿</button>':'')+
     '<input type="checkbox" '+(t.done?'checked ':'')+'data-act="toggle" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Mark done">'+
-    '<div class="tx">'+esc(t.t)+(t.n?'<span class="note">'+esc(t.n)+'</span>':'')+(showSrc?'<span class="src">'+esc(listLabel(L))+'</span>':'')+'</div>'+
+    '<div class="tx">'+esc(t.t)+(t.n?'<span class="note">'+esc(t.n)+'</span>':'')+dueChip(t)+(showSrc?'<span class="src">'+esc(listLabel(L))+'</span>':'')+'</div>'+
     '<div class="row-acts"><button class="ic" data-act="edit" data-id="'+t.id+'" aria-label="Edit task">Edit</button><button class="ic" data-act="deltask" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Delete task">Delete</button></div></li>';
 }
 function wipeBanner(){
@@ -469,6 +720,7 @@ function mainHtml(){
     return h+'</div>';
   }
   if(view==='settings')return h+settingsHtml()+'</div>';
+  if(view==='due')return h+dueHtml()+'</div>';
   if(cloud.needImport&&S.rev<1){var c=cloud.user;return h+'<div class="top"><h1>Import your lists</h1></div><div class="import"><p class="meta" style="margin:0">'+esc(c.path)+' is not in '+esc(c.owner+'/'+c.repo)+' yet. Choose your old my-lists.html (or a lists .json file) and it will be encrypted and saved there.</p><input type="file" id="importfile" accept=".html,.htm,.json" aria-label="Lists file"><div class="err" role="alert">'+esc(cloud.importErr)+'</div></div></div>';}
   h+=wipeBanner();
   var L=byId(cur);
@@ -514,6 +766,7 @@ function settingsHtml(){
   h+='<section class="card"><h2>Sound and vibration</h2>'+
      '<label class="row"><input type="checkbox" id="set-sound" data-act="setsound"'+(ls(SNDK)!=='off'?' checked':'')+'> Play a sound when I complete a task</label>'+
      ('vibrate' in navigator?'<label class="row"><input type="checkbox" id="set-vib" data-act="setvib"'+(ls(VIBK)!=='off'?' checked':'')+'> Vibrate when I complete a task (Android)</label>':'')+'</section>';
+  h+=remindersCard();
   h+='<section class="card"><h2>App lock</h2>';
   if(lk){
     h+='<p>On. The app asks for your PIN when it opens, and after a minute in the background.</p>'+
@@ -608,7 +861,7 @@ function render(){
   var total=S.lists.reduce(function(n,L){return n+openCount(L);},0);
   app.innerHTML='<aside class="side'+(drawer?' open':'')+'" id="side"><div class="brand">My Lists</div>'+
     '<div class="search"><input id="search" type="search" placeholder="Search all '+total+' tasks" value="'+esc(q)+'" aria-label="Search tasks"></div>'+
-    '<nav class="lists">'+sideHtml()+'</nav><div class="sidefoot">'+
+    '<nav class="lists"><button class="item duebtn'+(view==='due'&&!q?' on':'')+'" data-act="due"><span class="nm">Due</span><span class="ct'+(hotCount()?' hot':'')+'">'+(hotCount()||'')+'</span></button>'+sideHtml()+'</nav><div class="sidefoot">'+
     (adding?'<form class="newlist" data-form="addlist"><input id="nl-name" placeholder="List name" aria-label="List name" autocomplete="off"><input id="nl-group" list="groups" placeholder="Group (optional)" aria-label="Group" autocomplete="off"><datalist id="groups">'+Object.keys(S.lists.reduce(function(m,L){if(L.group)m[L.group]=1;return m;},{})).map(function(g){return '<option value="'+esc(g)+'">';}).join('')+'</datalist><div style="display:flex;gap:8px"><button class="btn primary" type="submit">Create list</button><button class="btn" type="button" data-act="canceladd">Cancel</button></div></form>':'<button class="btn primary" data-act="addlist">New list</button>')+
     '<div class="pair"><button class="btn" data-act="export">Copy as text</button><button class="btn" data-act="settings">Settings</button></div>'+
     (cloud.confirmOut?'<button class="btn danger" data-act="signoutyes">'+(isDirty()?'Sign out: unsynced changes will be lost':'Sign out and remove lists from this device')+'</button><button class="btn" data-act="signoutno">Stay signed in</button>':'<button class="btn" data-act="signout">Sign out</button>')+
@@ -694,21 +947,49 @@ document.addEventListener('click',function(e){
   var L=lid?byId(lid):byId(cur), s0, t;
   if(a==='signout'){cloud.confirmOut=true;render();return;}
   if(a==='signoutno'){cloud.confirmOut=false;render();return;}
-  if(a==='signoutyes'){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;view='lists';cloud.status='';cloud.needImport=false;cloud.pass=null;cloud.offerWipe=false;locked=false;lockErr='';sett.hist=null;sett.prev=null;hideToast();window.Cloud.signOut();return;}
+  if(a==='signoutyes'){
+    var finish=function(){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;clearTimeout(remTimer);S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;view='lists';cloud.status='';cloud.needImport=false;cloud.pass=null;cloud.offerWipe=false;locked=false;lockErr='';sett.hist=null;sett.prev=null;push.file=null;hideToast();window.Cloud.signOut();};
+    var me=myDevice();
+    if(me&&cloud.user&&getKeyInfo()&&!cloud.pass){   /* stop notifications to this device first (best effort, max 5 s) */
+      b.disabled=true;b.textContent='Signing out…';
+      Promise.race([remUpdate({msg:'Remove a device from reminders',mutate:function(file){delete file.devices[me.id];file.items=file.items.filter(function(it){return it.dev!==me.id;});}}),new Promise(function(r){setTimeout(r,5000);})])
+        .catch(function(){}).then(function(){if(!lsJson('my-lists-test-sub')&&pushSupported())navigator.serviceWorker.ready.then(function(r){return r.pushManager.getSubscription();}).then(function(s){return s&&s.unsubscribe();}).catch(function(){});finish();});
+    } else finish();
+    return;
+  }
   if(a==='undo'){if(!undoSnap)return;var o=JSON.parse(undoSnap);S.lists=o.lists;if(byId(o.cur))cur=o.cur;else if(!byId(cur))cur=(S.lists[0]||{}).id;editing=null;hideToast();save();render();return;}
   if(a==='biounlock'){var lk=lockInfo();if(!lk||!lk.cred)return;bioCheck(lk.cred).then(function(ok){if(ok)unlock();else{lockErr='Not recognised. Use your PIN.';render();}}).catch(function(){lockErr='Fingerprint / face unlock did not work. Use your PIN.';render();});return;}
   if(a==='toggle'){t=L.tasks.find(function(x){return x.id===id;});s0=snap();t.done=!t.done;if(t.done){celebrate(openCount(L)===0);}save();render();if(t.done)showToast('Completed “'+short(t.t)+'”',s0);return;}
   if(a==='pick'){cur=id;q='';confirmDel=false;drawer=false;exportText=null;view='lists';render();return;}
-  if(a==='settings'){view='settings';q='';drawer=false;exportText=null;editing=null;render();return;}
+  if(a==='due'){view='due';q='';drawer=false;exportText=null;editing=null;render();return;}
+  if(a==='ics'){
+    t=L.tasks.find(function(x){return x.id===id;});
+    var di=document.getElementById('edit-date'),ti=document.getElementById('edit-time');
+    var tt={id:t.id,t:(document.getElementById('edit-input')||{}).value||t.t,d:di?di.value:t.d,tm:ti?ti.value:t.tm};
+    if(!tt.d){var ee=document.getElementById('edit-err');if(ee)ee.textContent='Pick a due date first.';return;}
+    if(!tt.tm)delete tt.tm;
+    downloadFile('reminder.ics',icsText(tt,L),'text/calendar;charset=utf-8');
+    showToast('Calendar event made: open it to add it to your calendar');return;
+  }
+  if(a==='settings'){view='settings';q='';drawer=false;exportText=null;editing=null;push.file=null;render();loadPushInfo();return;}
+  if(a==='pushon'){enablePush();return;}
+  if(a==='pushoff'){removeDevice(id);return;}
+  if(a==='pushtest'){testPush();return;}
+  if(a==='setcalnames'||a==='setpushhide'){S.prefs=S.prefs||{};S.prefs[a==='setcalnames'?'calNames':'pushHide']=b.checked;save();return;}
   if(a==='drawer'){drawer=!drawer;render();return;}
   if(a==='edit'){editing=id;render();return;}
   if(a==='canceledit'){editing=null;render();return;}
   if(a==='saveedit'){
     t=L.tasks.find(function(x){return x.id===id;});
     var v=document.getElementById('edit-input').value.trim(),nt=document.getElementById('edit-note').value.replace(/\s+$/,''),mv=document.getElementById('edit-move').value;
+    var dd=document.getElementById('edit-date').value,dt=document.getElementById('edit-time').value,dr=document.getElementById('edit-rem').checked;
+    if(!dd&&(dt||dr)){document.getElementById('edit-err').textContent='Pick a due date first.';return;}
     var target=byId(mv)||L, changed=false; s0=snap();
     if(v&&v!==t.t){t.t=v;changed=true;}
     if(nt!==(t.n||'')){if(nt)t.n=nt;else delete t.n;changed=true;}
+    if(dd!==(t.d||'')||dt!==(t.tm||'')||dr!==!!t.rem){
+      if(dd)t.d=dd;else delete t.d; if(dd&&dt)t.tm=dt;else delete t.tm; if(dd&&dr)t.rem=1;else delete t.rem; changed=true;
+    }
     if(target!==L){L.tasks=L.tasks.filter(function(x){return x.id!==id;});target.tasks.push(t);changed=true;}
     editing=null;if(changed)save();render();
     if(target!==L)showToast('Moved to '+target.name,s0);
@@ -860,6 +1141,18 @@ document.addEventListener('change',function(e){
     var s;try{s=importText(text);}catch(x){cloud.importErr='That file has no lists in it.';render();return;}
     S=s;cur=(S.lists[0]||{}).id;cloud.needImport=false;cloud.importErr='';lsSave();setDirty(true);ls(SHAK,null);render();pushNow();
   });
+});
+/* opened from a notification: ./?task=<id> -> show that task's list */
+(function(){
+  var m=/[?&]task=([^&]+)/.exec(location.search);if(!m)return;
+  var tid=decodeURIComponent(m[1]),L=S.lists.find(function(x){return x.tasks.some(function(t){return t.id===tid;});});
+  if(L){cur=L.id;view='lists';}
+  try{history.replaceState(null,'',location.pathname);}catch(e){}
+})();
+navigator.serviceWorker&&navigator.serviceWorker.addEventListener&&navigator.serviceWorker.addEventListener('message',function(e){
+  var d=e.data||{};if(d.type!=='open-task')return;
+  var L=S.lists.find(function(x){return x.tasks.some(function(t){return t.id===d.task;});});
+  if(L){cur=L.id;view='lists';q='';drawer=false;render();}
 });
 initCloud();
 })();
