@@ -44,7 +44,7 @@
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font-body)}
-button,input,select{font:inherit;color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #app{display:flex;height:100%}
@@ -62,14 +62,17 @@ button{cursor:pointer}
 .item .ct{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
 .item.on .ct{color:var(--accent-ink);opacity:.85}
 .sidefoot{border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.sidefoot .pair{display:flex;gap:8px}
+.sidefoot .pair .btn{flex:1}
 .ver{color:var(--muted);font-size:12px;text-align:center;margin:0}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
 .btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.6;cursor:default}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.danger{color:var(--danger)}
 .newlist{display:flex;flex-direction:column;gap:6px}
 .newlist input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
-.main{flex:1;min-width:0;overflow-y:auto;padding:24px clamp(16px,4vw,48px) 64px}
+.main{flex:1;min-width:0;overflow-y:auto;padding:24px clamp(16px,4vw,48px) 96px}
 .wrap{max-width:720px;margin:0 auto}
 .top{display:flex;align-items:center;gap:10px;margin-bottom:4px}
 .menu{display:none}
@@ -80,50 +83,88 @@ h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing
 .add{display:flex;gap:8px;margin-bottom:14px}
 .add input{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .tasks{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px}
-.task{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line)}
-.task:last-child{border-bottom:0}
+.task{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.tasks .task:first-child{border-radius:12px 12px 0 0}
+.tasks .task:last-child{border-bottom:0;border-radius:0 0 12px 12px}
+.tasks .task:only-child{border-radius:12px}
 .task input[type=checkbox]{width:19px;height:19px;margin:2px 0 0;accent-color:var(--accent);flex:none}
 .task .tx{flex:1;min-width:0;overflow-wrap:anywhere}
 .task.done .tx{color:var(--muted);text-decoration:line-through}
+.task .note{display:block;font-size:14px;color:var(--muted);white-space:pre-wrap;margin-top:2px;text-decoration:none}
 .task .src{display:block;font-size:12px;color:var(--muted)}
 .task .row-acts{display:flex;gap:2px;flex:none}
+.task.dragging{position:relative;z-index:2;box-shadow:0 4px 16px rgba(0,0,0,.18);border-radius:10px}
+.grip{border:0;background:none;color:var(--muted);padding:0 4px;margin:0 -8px 0 -8px;font-size:18px;line-height:1.25;cursor:grab;touch-action:none;flex:none;user-select:none;-webkit-user-select:none}
+.grip:hover{color:var(--ink)}
 .ic{border:0;background:none;color:var(--muted);padding:2px 7px;border-radius:6px;font-size:14px}
 .ic:hover{color:var(--ink);background:var(--bg)}
 .edit{flex:1;padding:6px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--bg)}
+.editbox{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.editbox textarea{resize:vertical;min-height:72px}
+.editbox select{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);max-width:100%}
+.editbox label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .empty{padding:26px 16px;text-align:center;color:var(--muted)}
 .donehead{margin:22px 0 8px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
 .donehead button{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline}
 .export{width:100%;height:220px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
 .saved{font-size:12px;color:var(--muted);padding:0 2px}
-.auth{margin:auto;max-width:360px;width:100%;padding:28px 20px;display:flex;flex-direction:column;gap:12px}
+.auth{margin:auto;max-width:380px;width:100%;padding:28px 20px;display:flex;flex-direction:column;gap:12px}
 .auth h1{flex:none}
 .auth input{padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
-.auth .err{color:var(--danger);font-size:14px;min-height:20px}
+.auth .err{min-height:20px}
 .auth p{color:var(--muted);margin:0}
 .auth label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
 .auth label input{color:var(--ink);font-size:16px}
 .auth .hint{font-size:13px}
+.err{color:var(--danger);font-size:14px}
 .import{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px}
-.import .err{color:var(--danger);font-size:14px;min-height:20px}
-.linkbtn{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline}
+.import .err{min-height:20px}
+.linkbtn{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline;align-self:flex-start}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.small{font-size:13px;color:var(--muted)}
+.card,.banner{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:16px;display:flex;flex-direction:column;gap:10px}
+.banner{border-color:var(--accent)}
+.card h2{font:700 18px var(--font-display);margin:0}
+.card p,.banner p{margin:0}
+.card .row{display:flex;gap:10px;align-items:center}
+.card .row input{width:19px;height:19px;accent-color:var(--accent);flex:none}
+.card form{display:flex;flex-direction:column;gap:8px;max-width:360px}
+.card form label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.card form input{padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.vers{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:10px;max-height:340px;overflow-y:auto}
+.vers li{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.vers li:last-child{border-bottom:0}
+.vers li.on{background:var(--bg)}
+.vers .when{flex:1;min-width:0}
+.vers .when small{display:block;color:var(--muted)}
+.preview{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;background:var(--bg)}
+.preview ul{margin:0;padding-left:20px}
+.toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,160%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;display:flex;gap:16px;align-items:center;box-shadow:0 4px 18px rgba(0,0,0,.25);transition:transform .2s;z-index:10;max-width:calc(100vw - 32px)}
+.toast.show{transform:translate(-50%,0)}
+.toast .linkbtn{color:var(--bg);font-weight:600;align-self:auto}
 @media (max-width:760px){
   .side{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%);transition:transform .2s;width:min(300px,86vw)}
   .side.open{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.35)}
   .menu{display:inline-block}
 }
-@media (prefers-reduced-motion:reduce){.side{transition:none}}
+@media (prefers-reduced-motion:reduce){.side,.toast{transition:none}}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script id="state" type="application/json">{"rev":0,"lists":[]}</script>
 <script id="code">
 (function(){
+/* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
+var APP_VERSION='1.2.0';
 var S=JSON.parse(document.getElementById('state').textContent);
 var LSK='my-lists-state-v1';
 try{var l=JSON.parse(localStorage.getItem(LSK)||'null'); if(l&&l.rev>S.rev) S=l;}catch(e){}
-var cur=(S.lists[0]||{}).id, q='', editing=null, showDone={}, drawer=false, adding=false, confirmDel=false, exportText=null, focusNew=false;
-var cloud={user:null, status:'', authErr:'', busy:false, confirmOut:false, needImport:false, importErr:''}, pushTimer=null, pollTimer=null, inflight=false, again=false;
+var cur=(S.lists[0]||{}).id, q='', editing=null, showDone={}, drawer=false, adding=false, confirmDel=false, exportText=null, focusNew=false, view='lists';
+var cloud={user:null, status:'', authErr:'', busy:false, confirmOut:false, needImport:false, importErr:'', pass:null, passErr:'', passEnc:null, passRemote:null, encrypting:false, offerWipe:false},
+    pushTimer=null, pollTimer=null, inflight=false, again=false;
+var sett={pinOpen:false, pinErr:'', bioErr:'', passOpen:false, passErr:'', wipeConfirm:false, wipeBusy:false, wipeMsg:'', hist:null, prev:null};
 function uid(){return Math.random().toString(36).slice(2,9);}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function byId(id){return S.lists.find(function(x){return x.id===id;});}
@@ -138,21 +179,64 @@ function paintStatus(){var e=document.getElementById('status');if(e)e.textConten
 /* Sync: the lists live as one JSON file in a PRIVATE GitHub repo, read and written with the GitHub
    contents API using a fine-grained token kept on this device. Each save is a commit (history = backups).
    Newest rev wins: a write carries the file's last known sha; if someone else saved first GitHub refuses it,
-   we re-read, and keep whichever copy has the higher rev. localStorage keeps a copy so it works offline. */
-var GHK='my-lists-gh', TKK='my-lists-token', DIRTYK='my-lists-dirty', SHAK='my-lists-sha';
+   we re-read, and keep whichever copy has the higher rev. localStorage keeps a copy so it works offline.
+   Encryption: the file is AES-GCM encrypted with a key derived (PBKDF2-SHA256) from the user's passphrase.
+   The derived key is kept on each device (like the token); the passphrase itself is never stored. */
+var GHK='my-lists-gh', TKK='my-lists-token', DIRTYK='my-lists-dirty', SHAK='my-lists-sha', KEYK='my-lists-key',
+    LOCKK='my-lists-lock', FAILK='my-lists-lockfails', SNDK='my-lists-sound', VIBK='my-lists-vibrate';
+var KDF_ITER=600000, PIN_ITER=150000;
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null;}}
-function getCfg(){try{return JSON.parse(ls(GHK)||'null');}catch(e){return null;}}
+function lsJson(k){try{return JSON.parse(ls(k)||'null');}catch(e){return null;}}
+function getCfg(){return lsJson(GHK);}
 function setDirty(v){ls(DIRTYK,v?'1':null);}
 function isDirty(){return ls(DIRTYK)==='1';}
 function codeErr(c){var e=new Error(c);e.code=c;return e;}
-function b64enc(str){var b=new TextEncoder().encode(str),s='';for(var i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s);}
-function b64dec(b64){var bin=atob(b64.replace(/\s/g,'')),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u);}
+function b64enc(str){return b64u8(new TextEncoder().encode(str));}
+function b64dec(b64){return new TextDecoder().decode(u8(b64));}
+function u8(b64){var bin=atob(String(b64).replace(/\s/g,'')),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+function b64u8(buf){var b=new Uint8Array(buf),s='';for(var i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s);}
+function rand(n){return crypto.getRandomValues(new Uint8Array(n));}
 function validState(s){return s&&typeof s==='object'&&Array.isArray(s.lists)&&s.lists.every(function(L){return L&&typeof L.id==='string'&&typeof L.name==='string'&&Array.isArray(L.tasks);});}
+
+/* ---- encryption ---- */
+function deriveBits(secret,salt,iter){
+  return crypto.subtle.importKey('raw',new TextEncoder().encode(secret),'PBKDF2',false,['deriveBits'])
+    .then(function(k){return crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:salt,iterations:iter},k,256);});
+}
+function getKeyInfo(){return lsJson(KEYK);}   /* {salt, iter, k} (base64) */
+var keyCache=null;
+function aesKey(info){
+  if(keyCache&&keyCache.k===info.k)return Promise.resolve(keyCache.key);
+  return crypto.subtle.importKey('raw',u8(info.k),'AES-GCM',false,['encrypt','decrypt']).then(function(key){keyCache={k:info.k,key:key};return key;});
+}
+function makeKey(pass,salt64,iter){
+  return deriveBits(pass,u8(salt64),iter).then(function(bits){return {salt:salt64,iter:iter,k:b64u8(bits)};});
+}
+function isEnc(o){return !!o&&o.myLists==='enc1';}
+function encryptState(state,info){
+  var iv=rand(12);
+  return aesKey(info).then(function(key){return crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(JSON.stringify(state)));})
+    .then(function(ct){return JSON.stringify({myLists:'enc1',note:'My Lists data, encrypted (AES-GCM, key from passphrase via PBKDF2-SHA256)',kdf:'PBKDF2-SHA256',iter:info.iter,salt:info.salt,iv:b64u8(iv),ct:b64u8(ct)});});
+}
+function decryptWith(o,info){
+  return aesKey(info).then(function(key){return crypto.subtle.decrypt({name:'AES-GCM',iv:u8(o.iv)},key,u8(o.ct));})
+    .then(function(pt){return JSON.parse(new TextDecoder().decode(pt));});
+}
+/* text of the repo file -> Promise {state, plain}; rejects 'need-pass' (err.enc = file) when this device can't decrypt it */
+function openFile(text){
+  var o;try{o=JSON.parse(text);}catch(e){return Promise.reject(codeErr('bad-file'));}
+  if(!isEnc(o))return validState(o)?Promise.resolve({state:o,plain:true}):Promise.reject(codeErr('bad-file'));
+  var info=getKeyInfo(),np=codeErr('need-pass');np.enc=o;
+  if(!info||info.salt!==o.salt)return Promise.reject(np);
+  return decryptWith(o,info).then(function(s){if(!validState(s))throw codeErr('bad-file');return {state:s,plain:false};},function(){throw np;});
+}
+
 window.Cloud=(function(){
   var authCb=null;
   function base(){return ls('my-lists-api')||'https://api.github.com';}
   function enc(p){return String(p).split('/').map(encodeURIComponent).join('/');}
-  function fileUrl(c){return '/repos/'+enc(c.owner)+'/'+enc(c.repo)+'/contents/'+enc(c.path);}
+  function repoUrl(c){return '/repos/'+enc(c.owner)+'/'+enc(c.repo);}
+  function fileUrl(c){return repoUrl(c)+'/contents/'+enc(c.path);}
   function req(method,path,body,tok){
     var hd={'Authorization':'Bearer '+(tok||ls(TKK)),'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
     if(body)hd['Content-Type']='application/json';
@@ -164,35 +248,49 @@ window.Cloud=(function(){
         return r;
       });
   }
+  function json(r){if(!r.ok)throw codeErr('http-'+r.status);return r.json();}
   return {
     onAuth:function(cb){authCb=cb;cb(ls(TKK)&&getCfg()?getCfg():null);},
     signIn:function(tok,cfg){
-      return req('GET','/repos/'+enc(cfg.owner)+'/'+enc(cfg.repo),null,tok).then(function(r){
+      return req('GET',repoUrl(cfg),null,tok).then(function(r){
         if(r.status===404)throw codeErr('no-repo');
-        if(!r.ok)throw codeErr('http-'+r.status);
-        return r.json();
+        return json(r);
       }).then(function(repo){
         if(repo.private!==true)throw codeErr('public-repo');
         ls(TKK,tok);ls(GHK,JSON.stringify(cfg));if(authCb)authCb(cfg);
       });
     },
-    signOut:function(){[TKK,LSK,DIRTYK,SHAK].forEach(function(k){ls(k,null);});if(authCb)authCb(null);},
-    /* resolves null when the file does not exist yet, else {state, sha} */
-    get:function(){
-      return req('GET',fileUrl(getCfg())).then(function(r){
+    signOut:function(){[TKK,LSK,DIRTYK,SHAK,KEYK,LOCKK,FAILK].forEach(function(k){ls(k,null);});keyCache=null;if(authCb)authCb(null);},
+    /* resolves null when the file does not exist (at ref), else {state, sha, plain} */
+    get:function(ref){
+      return req('GET',fileUrl(getCfg())+(ref?'?ref='+encodeURIComponent(ref):'')).then(function(r){
         if(r.status===404)return null;
-        if(!r.ok)throw codeErr('http-'+r.status);
-        return r.json().then(function(j){var s;try{s=JSON.parse(b64dec(j.content));}catch(e){throw codeErr('bad-file');}if(!validState(s))throw codeErr('bad-file');return {state:s,sha:j.sha};});
+        return json(r).then(function(j){
+          var text;try{text=b64dec(j.content);}catch(e){throw codeErr('bad-file');}
+          return openFile(text).then(function(f){f.sha=j.sha;return f;});
+        });
       });
     },
-    /* resolves {sha} when saved, {conflict:true} when the file changed since `sha` */
+    /* encrypts and saves; resolves {sha} when saved, {conflict:true} when the file changed since `sha` */
     push:function(state,sha){
-      var body={message:'Update lists (rev '+state.rev+')',content:b64enc(JSON.stringify(state,null,1))};if(sha)body.sha=sha;
-      return req('PUT',fileUrl(getCfg()),body).then(function(r){
+      var info=getKeyInfo();if(!info)return Promise.reject(codeErr('need-pass'));
+      return encryptState(state,info).then(function(text){
+        var body={message:'Update lists (rev '+state.rev+')',content:b64enc(text)};if(sha)body.sha=sha;
+        return req('PUT',fileUrl(getCfg()),body);
+      }).then(function(r){
         if(r.status===409||r.status===422)return {conflict:true};
-        if(!r.ok)throw codeErr('http-'+r.status);
-        return r.json().then(function(j){return {sha:j.content.sha};});
+        return json(r).then(function(j){return {sha:j.content.sha};});
       });
+    },
+    /* saved versions of the file, newest first */
+    commits:function(){var c=getCfg();return req('GET',repoUrl(c)+'/commits?per_page=40&path='+encodeURIComponent(c.path)).then(json);},
+    /* replace the branch history with one commit holding the current files (drops older, unencrypted saves) */
+    wipe:function(){
+      var c=getCfg(),R=repoUrl(c),br;
+      return req('GET',R).then(json).then(function(repo){br=repo.default_branch;return req('GET',R+'/git/ref/heads/'+enc(br));}).then(json)
+        .then(function(ref){return req('GET',R+'/git/commits/'+ref.object.sha);}).then(json)
+        .then(function(cm){return req('POST',R+'/git/commits',{message:'Encrypted lists (older history erased)',tree:cm.tree.sha,parents:[]});}).then(json)
+        .then(function(nc){return req('PATCH',R+'/git/refs/heads/'+enc(br),{sha:nc.sha,force:true});}).then(json);
     }
   };
 })();
@@ -203,19 +301,24 @@ function applyRemote(remote,sha){
 }
 function pushNow(tries){
   clearTimeout(pushTimer); pushTimer=null;
-  if(!cloud.user||S.rev<1)return;
+  if(!cloud.user||S.rev<1||!getKeyInfo()||cloud.pass)return;
   if(inflight){again=true;return;}
   inflight=true; tries=tries||0; var sent=S.rev;
   window.Cloud.push(S,ls(SHAK)).then(function(res){
     if(!res.conflict){
       inflight=false; ls(SHAK,res.sha); if(S.rev===sent)setDirty(false);
       cloud.status='Synced'; paintStatus();
+      if(cloud.encrypting){cloud.encrypting=false;cloud.offerWipe=true;render();}
       if(again){again=false;if(isDirty())pushNow();}
       return;
     }
     return window.Cloud.get().then(function(f){
       inflight=false;
-      if(f&&f.state.rev>=S.rev){again=false;applyRemote(f.state,f.sha);cloud.status='Synced: loaded a newer copy from another device';paintStatus();return;}
+      if(f&&f.state.rev>=S.rev){
+        again=false;applyRemote(f.state,f.sha);cloud.status='Synced: loaded a newer copy from another device';paintStatus();
+        if(f.plain){cloud.encrypting=true;setDirty(true);pushNow();}   /* newer but unencrypted (old app version): keep it, encrypt it */
+        return;
+      }
       ls(SHAK,f?f.sha:null);
       if(tries<3)pushNow(tries+1);else{cloud.status='Could not save yet: will retry';paintStatus();}
     });
@@ -224,18 +327,35 @@ function pushNow(tries){
 function syncFail(err){
   var c=err&&err.code;
   if(c==='bad-token'){ls(TKK,null);cloud.user=null;cloud.authErr='GitHub no longer accepts the token (expired or revoked). Enter a new one.';stopPoll();render();return;}
+  if(c==='need-pass'){var had=!!getKeyInfo();ls(KEYK,null);keyCache=null;cloud.pass='enter';cloud.passEnc=err.enc||null;cloud.passErr=had?'The passphrase was changed on another device. Enter the new one.':'';render();return;}
   cloud.status=c==='network'?'Offline: changes are saved on this device':c==='rate-limit'?'GitHub rate limit reached: will retry':c==='forbidden'?'GitHub refused the save: check the token has Contents read and write':'Sync problem ('+c+'): changes are saved on this device';
   paintStatus();
 }
 function pull(){
-  if(!cloud.user||pushTimer||inflight)return;
+  if(!cloud.user||pushTimer||inflight||cloud.pass)return;
   window.Cloud.get().then(function(f){
+    if(!getKeyInfo()){                       /* repo file missing or still unencrypted: choose a passphrase first */
+      cloud.pass='set';cloud.passRemote=f;cloud.passErr='';render();return;
+    }
     if(!f){if(S.rev>=1){ls(SHAK,null);pushNow();}else{cloud.needImport=true;cloud.status='';render();}return;}
+    if(f.plain){                             /* an unencrypted copy (e.g. from an old version of the app): encrypt it now */
+      if(f.state.rev>S.rev&&!isDirty())applyRemote(f.state,f.sha);else ls(SHAK,f.sha);
+      cloud.encrypting=true;setDirty(true);pushNow();return;
+    }
     if(isDirty()){pushNow();return;}
     if(f.state.rev>S.rev)applyRemote(f.state,f.sha);
     else if(f.state.rev===S.rev)ls(SHAK,f.sha);
     cloud.status='Synced'; paintStatus();
   }).catch(syncFail);
+}
+/* after choosing a passphrase: encrypt whatever is in the repo (or this device's copy), or go on to the import */
+function afterPassSet(){
+  var f=cloud.passRemote; cloud.pass=null; cloud.passRemote=null; cloud.passErr='';
+  if(f){
+    if(f.state.rev>S.rev&&!isDirty())applyRemote(f.state,f.sha);else ls(SHAK,f.sha);
+    cloud.encrypting=!!f.plain; setDirty(true); render(); pushNow();
+  } else if(S.rev>=1){ls(SHAK,null);setDirty(true);render();pushNow();}
+  else{cloud.needImport=true;render();}
 }
 function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
 function startSync(cfg){
@@ -243,9 +363,37 @@ function startSync(cfg){
   stopPoll(); pollTimer=setInterval(function(){if(document.visibilityState==='visible')pull();},30000);
   render(); pull();
 }
+
+/* ---- app lock (this device only): PIN, optionally fingerprint / face via the device's own authenticator ---- */
+function lockInfo(){return lsJson(LOCKK);}   /* {salt, hash, cred?} */
+var locked=!!lockInfo(), hiddenAt=0, lockErr='', lockBusy=false;
+function hashPin(pin,salt64){return deriveBits(pin,u8(salt64),PIN_ITER).then(b64u8);}
+function bioAvailable(){
+  try{return window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(function(){return false;}):Promise.resolve(false);}
+  catch(e){return Promise.resolve(false);}
+}
+var bioOK=false; bioAvailable().then(function(v){bioOK=!!v;if(view==='settings')render();});
+function bioRegister(){
+  return navigator.credentials.create({publicKey:{challenge:rand(32),rp:{name:'My Lists'},user:{id:rand(16),name:'My Lists',displayName:'My Lists'},
+    pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+    authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'discouraged'},timeout:60000,attestation:'none'}})
+    .then(function(c){return b64u8(c.rawId);});
+}
+function bioCheck(id){
+  return navigator.credentials.get({publicKey:{challenge:rand(32),allowCredentials:[{type:'public-key',id:u8(id)}],userVerification:'required',timeout:60000}})
+    .then(function(a){return !!a&&(new Uint8Array(a.response.authenticatorData)[32]&4)!==0;});   /* UV flag: the person was verified */
+}
+function unlock(){locked=false;lockErr='';ls(FAILK,null);cloud.confirmOut=false;render();}
+function lockFail(){
+  var f=lsJson(FAILK)||{n:0,until:0}; f.n++;
+  if(f.n%5===0)f.until=Date.now()+30000*(f.n/5);
+  ls(FAILK,JSON.stringify(f)); lockErr='Wrong PIN.';
+}
 document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible')pull();
-  else if(pushTimer)pushNow();
+  if(document.visibilityState==='visible'){
+    if(lockInfo()&&hiddenAt&&Date.now()-hiddenAt>60000&&!locked){locked=true;render();}
+    pull();
+  } else {hiddenAt=Date.now();if(pushTimer)pushNow();}
 });
 window.addEventListener('online',function(){if(isDirty())pushNow();else pull();});
 function initCloud(){
@@ -262,7 +410,20 @@ function importText(text){
   s.rev=Math.max(s.rev|0,1); return s;
 }
 
+/* ---- undo: a snapshot of the lists taken before a change, offered in a toast for a few seconds ---- */
+var toastTimer=null, undoSnap=null;
+function snap(){return JSON.stringify({lists:S.lists,cur:cur});}
+function showToast(msg,s){
+  undoSnap=s||null;
+  var t=document.getElementById('toast');
+  t.innerHTML='<span>'+esc(msg)+'</span>'+(s?'<button class="linkbtn" data-act="undo">Undo</button>':'');
+  t.className='toast show'; clearTimeout(toastTimer); toastTimer=setTimeout(hideToast,s?6000:3500);
+}
+function hideToast(){document.getElementById('toast').className='toast';undoSnap=null;}
+function short(t){return t.length>40?t.slice(0,38)+'…':t;}
+
 function openCount(L){return L.tasks.filter(function(t){return !t.done;}).length;}
+function listLabel(L){return (L.group?L.group+' / ':'')+L.name;}
 function sideHtml(){
   var out='',seen={};
   S.lists.forEach(function(L){
@@ -275,24 +436,41 @@ function sideHtml(){
   return out;
 }
 function itemHtml(L,sub){
-  return '<button class="item'+(sub?' sub':'')+(L.id===cur&&!q?' on':'')+'" data-act="pick" data-id="'+L.id+'"><span class="nm">'+esc(L.name)+'</span><span class="ct">'+(openCount(L)||'')+'</span></button>';
+  return '<button class="item'+(sub?' sub':'')+(L.id===cur&&!q&&view==='lists'?' on':'')+'" data-act="pick" data-id="'+L.id+'"><span class="nm">'+esc(L.name)+'</span><span class="ct">'+(openCount(L)||'')+'</span></button>';
 }
-function taskHtml(L,t,showSrc){
+function taskHtml(L,t,showSrc,grip){
   if(editing===t.id){
-    return '<li class="task"><input class="edit" id="edit-input" value="'+esc(t.t)+'" data-id="'+t.id+'" aria-label="Edit task"><div class="row-acts"><button class="ic" data-act="saveedit" data-list="'+L.id+'" data-id="'+t.id+'">Save</button><button class="ic" data-act="canceledit">Cancel</button></div></li>';
+    return '<li class="task" data-id="'+t.id+'"><div class="editbox">'+
+      '<input class="edit" id="edit-input" value="'+esc(t.t)+'" data-id="'+t.id+'" aria-label="Task">'+
+      '<textarea class="edit" id="edit-note" placeholder="Notes (optional)" aria-label="Notes">'+esc(t.n||'')+'</textarea>'+
+      '<label>List<select id="edit-move">'+S.lists.map(function(x){return '<option value="'+x.id+'"'+(x.id===L.id?' selected':'')+'>'+esc(listLabel(x))+'</option>';}).join('')+'</select></label>'+
+      '<div class="btns"><button class="btn primary" data-act="saveedit" data-list="'+L.id+'" data-id="'+t.id+'">Save</button><button class="btn" data-act="canceledit">Cancel</button></div></div></li>';
   }
-  return '<li class="task'+(t.done?' done':'')+'"><input type="checkbox" '+(t.done?'checked ':'')+'data-act="toggle" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Mark done"><div class="tx">'+esc(t.t)+(showSrc?'<span class="src">'+esc((L.group?L.group+' / ':'')+L.name)+'</span>':'')+'</div><div class="row-acts"><button class="ic" data-act="edit" data-id="'+t.id+'" aria-label="Edit task">Edit</button><button class="ic" data-act="deltask" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Delete task">Delete</button></div></li>';
+  return '<li class="task'+(t.done?' done':'')+'" data-id="'+t.id+'">'+
+    (grip?'<button class="grip" data-id="'+t.id+'" aria-label="Move task: drag, or use the up and down arrow keys" title="Drag to reorder">⠿</button>':'')+
+    '<input type="checkbox" '+(t.done?'checked ':'')+'data-act="toggle" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Mark done">'+
+    '<div class="tx">'+esc(t.t)+(t.n?'<span class="note">'+esc(t.n)+'</span>':'')+(showSrc?'<span class="src">'+esc(listLabel(L))+'</span>':'')+'</div>'+
+    '<div class="row-acts"><button class="ic" data-act="edit" data-id="'+t.id+'" aria-label="Edit task">Edit</button><button class="ic" data-act="deltask" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Delete task">Delete</button></div></li>';
+}
+function wipeBanner(){
+  if(!cloud.offerWipe)return '';
+  return '<div class="banner" id="wipe-banner"><p><strong>Your lists are now encrypted in GitHub.</strong> Older saves from before encryption are still in the repo\'s history, unencrypted.</p>'+
+    (sett.wipeMsg?'<p class="err">'+esc(sett.wipeMsg)+'</p>':'')+
+    '<div class="btns"><button class="btn primary" data-act="wipeyes"'+(sett.wipeBusy?' disabled':'')+'>'+(sett.wipeBusy?'Erasing…':'Erase the old history')+'</button><button class="btn" data-act="wipelater">Not now</button></div>'+
+    '<p class="small">Keeps only the current, encrypted copy. You can also do this later in Settings.</p></div>';
 }
 function mainHtml(){
   var h='<div class="wrap">';
   if(q){
     var ql=q.toLowerCase(),res=[];
-    S.lists.forEach(function(L){L.tasks.forEach(function(t){if(t.t.toLowerCase().indexOf(ql)>-1)res.push([L,t]);});});
+    S.lists.forEach(function(L){L.tasks.forEach(function(t){if(t.t.toLowerCase().indexOf(ql)>-1||(t.n&&t.n.toLowerCase().indexOf(ql)>-1))res.push([L,t]);});});
     h+='<div class="top"><button class="btn menu" data-act="drawer" aria-label="Show lists">Lists</button><h1>Search</h1></div><p class="meta">'+res.length+' match'+(res.length===1?'':'es')+' for “'+esc(q)+'”</p>';
     h+=res.length?'<ul class="tasks">'+res.map(function(r){return taskHtml(r[0],r[1],true);}).join('')+'</ul>':'<div class="tasks"><div class="empty">Nothing matches.</div></div>';
     return h+'</div>';
   }
-  if(cloud.needImport&&S.rev<1){var c=cloud.user;return h+'<div class="top"><h1>Import your lists</h1></div><div class="import"><p class="meta" style="margin:0">'+esc(c.path)+' is not in '+esc(c.owner+'/'+c.repo)+' yet. Choose your old my-lists.html (or a lists .json file) and it will be saved there.</p><input type="file" id="importfile" accept=".html,.htm,.json" aria-label="Lists file"><div class="err" role="alert">'+esc(cloud.importErr)+'</div></div></div>';}
+  if(view==='settings')return h+settingsHtml()+'</div>';
+  if(cloud.needImport&&S.rev<1){var c=cloud.user;return h+'<div class="top"><h1>Import your lists</h1></div><div class="import"><p class="meta" style="margin:0">'+esc(c.path)+' is not in '+esc(c.owner+'/'+c.repo)+' yet. Choose your old my-lists.html (or a lists .json file) and it will be encrypted and saved there.</p><input type="file" id="importfile" accept=".html,.htm,.json" aria-label="Lists file"><div class="err" role="alert">'+esc(cloud.importErr)+'</div></div></div>';}
+  h+=wipeBanner();
   var L=byId(cur);
   if(!L){return h+'<div class="empty">No list selected.</div></div>';}
   var open=L.tasks.filter(function(t){return !t.done;}),done=L.tasks.filter(function(t){return t.done;});
@@ -300,18 +478,94 @@ function mainHtml(){
   h+='<p class="meta">'+(L.group?esc(L.group)+' · ':'')+open.length+' open'+(done.length?' · '+done.length+' done':'')+'</p>';
   h+='<div class="acts"><button class="btn" data-act="rename">Rename list</button>'+
      (confirmDel?'<button class="btn danger" data-act="delconfirm">Confirm delete list</button><button class="btn" data-act="delcancel">Keep it</button>':'<button class="btn danger" data-act="dellist">Delete list</button>')+
-     (done.length?'<button class="btn" data-act="cleardone">Clear completed</button>':'')+'</div>';
+     (done.length?'<button class="btn" data-act="untick">Untick all</button><button class="btn" data-act="cleardone">Clear completed</button>':'')+'</div>';
   h+='<form class="add" data-form="addtask"><input id="newtask" placeholder="Add a task" autocomplete="off" aria-label="New task"><button class="btn primary" type="submit">Add</button></form>';
-  h+=open.length?'<ul class="tasks">'+open.map(function(t){return taskHtml(L,t);}).join('')+'</ul>':'<div class="tasks"><div class="empty">'+(L.tasks.length?'All done.':'This list is empty.')+'</div></div>';
+  h+=open.length?'<ul class="tasks" id="open-tasks" data-list="'+L.id+'">'+open.map(function(t){return taskHtml(L,t,false,open.length>1);}).join('')+'</ul>':'<div class="tasks"><div class="empty">'+(L.tasks.length?'All done.':'This list is empty.')+'</div></div>';
   if(done.length){
     h+='<div class="donehead"><span>Completed ('+done.length+')</span><button data-act="toggledone">'+(showDone[L.id]?'Hide':'Show')+'</button></div>';
     if(showDone[L.id])h+='<ul class="tasks">'+done.map(function(t){return taskHtml(L,t);}).join('')+'</ul>';
   }
   return h+'</div>';
 }
-/* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
-var APP_VERSION='1.1.0';
+
+/* ---- settings ---- */
+function fmtDate(d){try{return new Date(d).toLocaleString([], {dateStyle:'medium',timeStyle:'short'});}catch(e){return d;}}
+function countTasks(st){var t=0,o=0;st.lists.forEach(function(L){t+=L.tasks.length;o+=openCount(L);});return {t:t,o:o};}
+function diffHtml(old){
+  var nowL={},oldL={},nowT={},oldT={};
+  S.lists.forEach(function(L){nowL[L.id]=1;L.tasks.forEach(function(t){nowT[t.id]=1;});});
+  old.lists.forEach(function(L){oldL[L.id]=1;L.tasks.forEach(function(t){oldT[t.id]=1;});});
+  function names(arr){var n=arr.slice(0,8).map(function(x){return '<li>'+esc(x)+'</li>';}).join('');return n+(arr.length>8?'<li>and '+(arr.length-8)+' more</li>':'');}
+  var backL=old.lists.filter(function(L){return !nowL[L.id];}).map(listLabel),
+      goneL=S.lists.filter(function(L){return !oldL[L.id];}).map(listLabel),
+      backT=[],goneT=[];
+  old.lists.forEach(function(L){if(nowL[L.id])L.tasks.forEach(function(t){if(!nowT[t.id])backT.push(t.t+' ('+L.name+')');});});
+  S.lists.forEach(function(L){if(oldL[L.id])L.tasks.forEach(function(t){if(!oldT[t.id])goneT.push(t.t+' ('+L.name+')');});});
+  var h='';
+  if(backL.length)h+='<p>Brings back these lists:</p><ul>'+names(backL)+'</ul>';
+  if(backT.length)h+='<p>Brings back these tasks:</p><ul>'+names(backT)+'</ul>';
+  if(goneL.length)h+='<p>Removes these lists (added since):</p><ul>'+names(goneL)+'</ul>';
+  if(goneT.length)h+='<p>Removes these tasks (added since):</p><ul>'+names(goneT)+'</ul>';
+  return h||'<p>Same lists and tasks as now (ticks, names or notes may differ).</p>';
+}
+function settingsHtml(){
+  var lk=lockInfo(), h='<div class="top"><button class="btn menu" data-act="drawer" aria-label="Show lists">Lists</button><h1>Settings</h1></div><p class="meta">Sound, vibration and app lock apply to this device only.</p>';
+  h+=wipeBanner();
+  h+='<section class="card"><h2>Sound and vibration</h2>'+
+     '<label class="row"><input type="checkbox" id="set-sound" data-act="setsound"'+(ls(SNDK)!=='off'?' checked':'')+'> Play a sound when I complete a task</label>'+
+     ('vibrate' in navigator?'<label class="row"><input type="checkbox" id="set-vib" data-act="setvib"'+(ls(VIBK)!=='off'?' checked':'')+'> Vibrate when I complete a task (Android)</label>':'')+'</section>';
+  h+='<section class="card"><h2>App lock</h2>';
+  if(lk){
+    h+='<p>On. The app asks for your PIN when it opens, and after a minute in the background.</p>'+
+       '<div class="btns"><button class="btn" data-act="pinopen">Change PIN</button>'+
+       (lk.cred?'<button class="btn" data-act="biooff">Stop using fingerprint / face</button>':bioOK?'<button class="btn" data-act="bioon">Also unlock with fingerprint / face</button>':'')+
+       '<button class="btn danger" data-act="lockoff">Turn off app lock</button></div>';
+  } else h+='<p>Off. Turn it on so the app needs a PIN to open on this device.</p>'+(sett.pinOpen?'':'<div class="btns"><button class="btn primary" data-act="pinopen">Set a PIN</button></div>');
+  if(sett.bioErr)h+='<p class="err">'+esc(sett.bioErr)+'</p>';
+  if(sett.pinOpen)h+='<form data-form="setpin"><label>New PIN (4 or more digits)<input id="pin1" type="password" inputmode="numeric" autocomplete="off"></label><label>Type it again<input id="pin2" type="password" inputmode="numeric" autocomplete="off"></label>'+
+     '<p class="err" id="pin-err" role="alert">'+esc(sett.pinErr)+'</p><div class="btns"><button class="btn primary" type="submit">Save PIN</button><button class="btn" type="button" data-act="pincancel">Cancel</button></div></form>';
+  h+='<p class="small">The lock covers the screen. If you forget the PIN, sign out from the lock screen and reconnect with your token and passphrase.</p></section>';
+  h+='<section class="card"><h2>Encryption</h2><p>Your lists are encrypted on this device with your passphrase before they are saved to GitHub. GitHub, and anyone who gets your token, sees only scrambled data.</p>';
+  if(sett.passOpen)h+='<form data-form="changepass"><label>New passphrase<input id="np1" type="password" autocomplete="new-password"></label><label>Type it again<input id="np2" type="password" autocomplete="new-password"></label>'+
+     '<p class="err" id="np-err" role="alert">'+esc(sett.passErr)+'</p><p class="small">Your other devices will ask for the new passphrase. Saved versions from before the change can only be opened with the old one.</p>'+
+     '<div class="btns"><button class="btn primary" type="submit"'+(cloud.busy?' disabled':'')+'>'+(cloud.busy?'Encrypting…':'Change passphrase')+'</button><button class="btn" type="button" data-act="passcancel">Cancel</button></div></form>';
+  else h+='<div class="btns"><button class="btn" data-act="passopen">Change passphrase</button>'+(sett.wipeConfirm?'':'<button class="btn danger" data-act="wipeask">Erase older history in GitHub</button>')+'</div>';
+  if(sett.wipeConfirm)h+='<p>Erase every older save, keeping only the current encrypted copy? Saved versions will no longer be available. This cannot be undone.</p>'+
+     '<div class="btns"><button class="btn danger" data-act="wipeyes"'+(sett.wipeBusy?' disabled':'')+'>'+(sett.wipeBusy?'Erasing…':'Yes, erase older history')+'</button><button class="btn" data-act="wipeno">Cancel</button></div>';
+  if(sett.wipeMsg&&!cloud.offerWipe)h+='<p class="err">'+esc(sett.wipeMsg)+'</p>';
+  h+='</section>';
+  h+='<section class="card"><h2>Saved versions</h2><p>Every save is kept in GitHub. Open an earlier one to see how it differs from now, and restore it if you need to.</p>';
+  var hs=sett.hist;
+  if(!hs)h+='<div class="btns"><button class="btn" data-act="histload">Show saved versions</button></div>';
+  else if(hs.loading)h+='<p class="small">Loading…</p>';
+  else if(hs.err)h+='<p class="err">'+esc(hs.err)+'</p><div class="btns"><button class="btn" data-act="histload">Try again</button></div>';
+  else{
+    h+='<ul class="vers" id="versions">'+hs.items.map(function(it,i){
+      return '<li'+(sett.prev&&sett.prev.sha===it.sha?' class="on"':'')+'><span class="when">'+esc(fmtDate(it.date))+(i===0?' (current)':'')+'<small>'+esc(it.msg)+'</small></span>'+(i===0?'':'<button class="btn" data-act="histprev" data-id="'+it.sha+'">Open</button>')+'</li>';
+    }).join('')+'</ul>';
+    if(!hs.items.length)h+='<p class="small">No saved versions yet.</p>';
+    var p=sett.prev;
+    if(p){
+      h+='<div class="preview" id="preview">';
+      if(p.loading)h+='<p class="small">Opening…</p>';
+      else if(p.err)h+='<p class="err">'+esc(p.err)+'</p>';
+      else{var a=countTasks(p.state),b=countTasks(S);
+        h+='<p><strong>'+esc(fmtDate(p.date))+'</strong>: '+p.state.lists.length+' lists, '+a.t+' tasks ('+a.o+' open). Now: '+S.lists.length+' lists, '+b.t+' tasks ('+b.o+' open).</p>'+diffHtml(p.state)+
+           '<div class="btns"><button class="btn primary" data-act="histrestore">Restore this version</button><button class="btn" data-act="histclose">Close</button></div>';}
+      h+='</div>';
+    }
+  }
+  h+='</section>';
+  return h;
+}
+
 function defaultOwner(){return /\.github\.io$/.test(location.hostname)?location.hostname.split('.')[0]:'';}
+function verHtml(){return '<p class="ver" id="app-version">Version '+APP_VERSION+'</p>';}
+function signOutBit(label){
+  return cloud.confirmOut
+    ?'<p class="hint">'+(isDirty()?'Changes not yet synced will be lost. ':'')+'Signing out removes your lists, token and passphrase key from this device. Your lists stay in GitHub; reconnect with your token and passphrase.</p><div class="btns"><button class="btn danger" type="button" data-act="signoutyes">Sign out</button><button class="btn" type="button" data-act="signoutno">Cancel</button></div>'
+    :'<button class="linkbtn" type="button" data-act="signout">'+label+'</button>';
+}
 function authHtml(){
   var c=getCfg()||{owner:defaultOwner(),repo:'my-lists-data',path:'lists.json'};
   function f(id,label,v){return '<label>'+label+'<input id="'+id+'" value="'+esc(v)+'" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>';}
@@ -321,26 +575,51 @@ function authHtml(){
     '<label>Access token<input id="au-pw" type="password" autocomplete="current-password" placeholder="github_pat_…" required></label>'+
     '<div class="err" id="au-err" role="alert">'+esc(cloud.authErr)+'</div>'+
     '<button class="btn primary" type="submit"'+(cloud.busy?' disabled':'')+'>'+(cloud.busy?'Checking…':'Connect')+'</button>'+
-    '<p class="hint">Use a fine-grained token that can only see this repo, with Contents: Read and write. It stays on this device.</p><p class="ver" id="app-version">Version '+APP_VERSION+'</p></form>';
+    '<p class="hint">Use a fine-grained token that can only see this repo, with Contents: Read and write. It stays on this device.</p>'+verHtml()+'</form>';
 }
+function passHtml(){
+  var set=cloud.pass==='set';
+  return '<form class="auth" data-form="'+(set?'setpass':'enterpass')+'"><h1>'+(set?'Encrypt your lists':'Enter your passphrase')+'</h1>'+
+    (set?'<p>Choose a passphrase. Your lists are encrypted with it on this device before they are saved to GitHub, so GitHub, and anyone who gets your token, sees only scrambled data.</p><p>You enter it once on each device. Keep it somewhere safe: without it the copy in GitHub cannot be opened.</p>'
+        :'<p>Your lists in GitHub are encrypted. Enter your passphrase to open them on this device.</p>')+
+    '<input type="text" name="username" value="my-lists-passphrase" autocomplete="username" hidden>'+
+    '<label>Passphrase'+(set?' (8 or more characters)':'')+'<input id="pp1" type="password" autocomplete="'+(set?'new-password':'current-password')+'"></label>'+
+    (set?'<label>Type it again<input id="pp2" type="password" autocomplete="new-password"></label>':'')+
+    '<div class="err" id="pp-err" role="alert">'+esc(cloud.passErr)+'</div>'+
+    '<button class="btn primary" type="submit"'+(cloud.busy?' disabled':'')+'>'+(cloud.busy?(set?'Encrypting…':'Opening…'):(set?'Encrypt my lists':'Open my lists'))+'</button>'+
+    signOutBit('Sign out')+verHtml()+'</form>';
+}
+function lockHtml(){
+  var lk=lockInfo();
+  return '<form class="auth" data-form="unlock"><h1>My Lists</h1><p>Locked. Enter your PIN to open your lists.</p>'+
+    '<label>PIN<input id="lock-pin" type="password" inputmode="numeric" autocomplete="off"></label>'+
+    '<div class="err" id="lock-err" role="alert">'+esc(lockErr)+'</div>'+
+    '<button class="btn primary" type="submit"'+(lockBusy?' disabled':'')+'>'+(lockBusy?'Checking…':'Unlock')+'</button>'+
+    (lk&&lk.cred?'<button class="btn" type="button" data-act="biounlock">Unlock with fingerprint / face</button>':'')+
+    signOutBit('Forgot your PIN? Sign out')+verHtml()+'</form>';
+}
+var drag=null, renderLater=false;
 function render(){
+  if(drag){renderLater=true;return;}
   var app=document.getElementById('app');
   if(!cloud.user){app.innerHTML=authHtml();var pw=document.getElementById('au-pw');if(pw&&!cloud.busy)pw.focus();return;}
+  if(locked&&lockInfo()){app.innerHTML=lockHtml();var lp=document.getElementById('lock-pin');if(lp&&!lockBusy&&!cloud.confirmOut)lp.focus();return;}
+  if(cloud.pass){app.innerHTML=passHtml();var p1=document.getElementById('pp1');if(p1&&!cloud.busy&&!cloud.confirmOut)p1.focus();return;}
   var total=S.lists.reduce(function(n,L){return n+openCount(L);},0);
   app.innerHTML='<aside class="side'+(drawer?' open':'')+'" id="side"><div class="brand">My Lists</div>'+
     '<div class="search"><input id="search" type="search" placeholder="Search all '+total+' tasks" value="'+esc(q)+'" aria-label="Search tasks"></div>'+
     '<nav class="lists">'+sideHtml()+'</nav><div class="sidefoot">'+
     (adding?'<form class="newlist" data-form="addlist"><input id="nl-name" placeholder="List name" aria-label="List name" autocomplete="off"><input id="nl-group" list="groups" placeholder="Group (optional)" aria-label="Group" autocomplete="off"><datalist id="groups">'+Object.keys(S.lists.reduce(function(m,L){if(L.group)m[L.group]=1;return m;},{})).map(function(g){return '<option value="'+esc(g)+'">';}).join('')+'</datalist><div style="display:flex;gap:8px"><button class="btn primary" type="submit">Create list</button><button class="btn" type="button" data-act="canceladd">Cancel</button></div></form>':'<button class="btn primary" data-act="addlist">New list</button>')+
-    '<button class="btn" data-act="export">Copy everything as text</button>'+
+    '<div class="pair"><button class="btn" data-act="export">Copy as text</button><button class="btn" data-act="settings">Settings</button></div>'+
     (cloud.confirmOut?'<button class="btn danger" data-act="signoutyes">'+(isDirty()?'Sign out: unsynced changes will be lost':'Sign out and remove lists from this device')+'</button><button class="btn" data-act="signoutno">Stay signed in</button>':'<button class="btn" data-act="signout">Sign out</button>')+
-    '<span class="saved" id="status">'+esc(cloud.status)+'</span><span class="ver" id="app-version">Version '+APP_VERSION+'</span></div></aside>'+
+    '<span class="saved" id="status">'+esc(cloud.status)+'</span>'+verHtml()+'</div></aside>'+
     '<main class="main" id="mainpane">'+mainHtml()+(exportText!==null?'<div class="wrap"><textarea class="export" id="exp" readonly aria-label="All lists as text">'+esc(exportText)+'</textarea></div>':'')+'</main>';
   if(focusNew){var n=document.getElementById('newtask');if(n)n.focus();focusNew=false;}
-  var ei=document.getElementById('edit-input');if(ei){ei.focus();ei.setSelectionRange(ei.value.length,ei.value.length);}
+  var ei=document.getElementById('edit-input');if(ei&&document.activeElement!==document.getElementById('edit-note')){ei.focus();ei.setSelectionRange(ei.value.length,ei.value.length);}
   var nl=document.getElementById('nl-name');if(nl&&adding)nl.focus();
 }
 function toText(){
-  return S.lists.map(function(L){return (L.group?L.group+' / ':'')+L.name+'\n'+(L.tasks.length?L.tasks.map(function(t){return (t.done?'[x] ':'[ ] ')+t.t;}).join('\n'):'(empty)');}).join('\n\n');
+  return S.lists.map(function(L){return listLabel(L)+'\n'+(L.tasks.length?L.tasks.map(function(t){return (t.done?'[x] ':'[ ] ')+t.t+(t.n?'\n    '+t.n.replace(/\n/g,'\n    '):'');}).join('\n'):'(empty)');}).join('\n\n');
 }
 /* Chiptune "level up" when a task is ticked off, made with Web Audio (no sound files).
    allDone = that was the last open task in the list, so it plays a longer fanfare. */
@@ -368,29 +647,102 @@ function winSound(allDone){
     }
   }catch(err){}
 }
+function celebrate(allDone){
+  if(ls(SNDK)!=='off')winSound(allDone);
+  if(ls(VIBK)!=='off'&&navigator.vibrate){try{navigator.vibrate(allDone?[25,50,25,50,90]:30);}catch(e){}}
+}
+/* reorder: open tasks follow `ids`; completed tasks keep their relative order after them */
+function applyOrder(L,ids){
+  var moved=ids.map(function(i){return L.tasks.find(function(t){return t.id===i;});}).filter(Boolean);
+  L.tasks=moved.concat(L.tasks.filter(function(t){return ids.indexOf(t.id)<0;}));
+}
+function loadHist(){
+  sett.hist={loading:true};sett.prev=null;render();
+  window.Cloud.commits().then(function(list){
+    sett.hist={items:list.map(function(c){return {sha:c.sha,date:c.commit.committer.date,msg:c.commit.message};})};render();
+  }).catch(function(err){var c=err&&err.code;if(c==='bad-token')return syncFail(err);sett.hist={err:c==='network'?'Cannot reach GitHub. Try again when you are online.':'Could not load saved versions ('+c+').'};render();});
+}
+function openVersion(sha){
+  var it=(sett.hist.items||[]).find(function(x){return x.sha===sha;});
+  sett.prev={sha:sha,date:it&&it.date,loading:true};render();
+  window.Cloud.get(sha).then(function(f){
+    if(!f)throw codeErr('gone');
+    sett.prev={sha:sha,date:it&&it.date,state:f.state};render();
+    var pv=document.getElementById('preview');if(pv)pv.scrollIntoView({block:'nearest'});
+  }).catch(function(err){
+    var c=err&&err.code;
+    sett.prev={sha:sha,date:it&&it.date,err:c==='need-pass'?'This version was saved with a different passphrase, so it cannot be opened here.':c==='gone'?'The lists file did not exist in this version.':c==='network'?'Cannot reach GitHub.':'Could not open this version ('+c+').'};render();
+  });
+}
+function doWipe(){
+  if(isDirty()||inflight||pushTimer){sett.wipeMsg='Wait until everything shows Synced, then try again.';render();return;}
+  sett.wipeBusy=true;sett.wipeMsg='';render();
+  window.Cloud.get().then(function(f){if(!f||f.plain)throw codeErr('not-encrypted');return window.Cloud.wipe();}).then(function(){
+    sett.wipeBusy=false;sett.wipeConfirm=false;cloud.offerWipe=false;sett.hist=null;sett.prev=null;
+    showToast('Older history erased. GitHub now holds only the encrypted copy.');render();pull();
+  }).catch(function(err){
+    var c=err&&err.code;sett.wipeBusy=false;
+    if(c==='bad-token'||c==='need-pass')return syncFail(err);
+    sett.wipeMsg=c==='not-encrypted'?'The copy in GitHub is not encrypted yet. Wait for it to sync, then try again.':c==='forbidden'?'GitHub refused. The token needs Contents: Read and write.':c==='network'?'Cannot reach GitHub.':'Could not erase the history ('+c+').';
+    render();
+  });
+}
+
 document.addEventListener('click',function(e){
   var b=e.target.closest('[data-act]');if(!b)return;
   var a=b.getAttribute('data-act'),id=b.getAttribute('data-id'),lid=b.getAttribute('data-list');
-  var L=lid?byId(lid):byId(cur);
+  var L=lid?byId(lid):byId(cur), s0, t;
   if(a==='signout'){cloud.confirmOut=true;render();return;}
   if(a==='signoutno'){cloud.confirmOut=false;render();return;}
-  if(a==='signoutyes'){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;cloud.status='';cloud.needImport=false;window.Cloud.signOut();return;}
-  if(a==='toggle'){var t=L.tasks.find(function(x){return x.id===id;});t.done=!t.done;if(t.done)winSound(openCount(L)===0);save();render();return;}
-  if(a==='pick'){cur=id;q='';confirmDel=false;drawer=false;exportText=null;render();return;}
+  if(a==='signoutyes'){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;view='lists';cloud.status='';cloud.needImport=false;cloud.pass=null;cloud.offerWipe=false;locked=false;lockErr='';sett.hist=null;sett.prev=null;hideToast();window.Cloud.signOut();return;}
+  if(a==='undo'){if(!undoSnap)return;var o=JSON.parse(undoSnap);S.lists=o.lists;if(byId(o.cur))cur=o.cur;else if(!byId(cur))cur=(S.lists[0]||{}).id;editing=null;hideToast();save();render();return;}
+  if(a==='biounlock'){var lk=lockInfo();if(!lk||!lk.cred)return;bioCheck(lk.cred).then(function(ok){if(ok)unlock();else{lockErr='Not recognised. Use your PIN.';render();}}).catch(function(){lockErr='Fingerprint / face unlock did not work. Use your PIN.';render();});return;}
+  if(a==='toggle'){t=L.tasks.find(function(x){return x.id===id;});s0=snap();t.done=!t.done;if(t.done){celebrate(openCount(L)===0);}save();render();if(t.done)showToast('Completed “'+short(t.t)+'”',s0);return;}
+  if(a==='pick'){cur=id;q='';confirmDel=false;drawer=false;exportText=null;view='lists';render();return;}
+  if(a==='settings'){view='settings';q='';drawer=false;exportText=null;editing=null;render();return;}
   if(a==='drawer'){drawer=!drawer;render();return;}
   if(a==='edit'){editing=id;render();return;}
   if(a==='canceledit'){editing=null;render();return;}
-  if(a==='saveedit'){var v=document.getElementById('edit-input').value.trim();if(v){L.tasks.find(function(x){return x.id===id;}).t=v;save();}editing=null;render();return;}
-  if(a==='deltask'){L.tasks=L.tasks.filter(function(x){return x.id!==id;});save();render();return;}
+  if(a==='saveedit'){
+    t=L.tasks.find(function(x){return x.id===id;});
+    var v=document.getElementById('edit-input').value.trim(),nt=document.getElementById('edit-note').value.replace(/\s+$/,''),mv=document.getElementById('edit-move').value;
+    var target=byId(mv)||L, changed=false; s0=snap();
+    if(v&&v!==t.t){t.t=v;changed=true;}
+    if(nt!==(t.n||'')){if(nt)t.n=nt;else delete t.n;changed=true;}
+    if(target!==L){L.tasks=L.tasks.filter(function(x){return x.id!==id;});target.tasks.push(t);changed=true;}
+    editing=null;if(changed)save();render();
+    if(target!==L)showToast('Moved to '+target.name,s0);
+    return;
+  }
+  if(a==='deltask'){t=L.tasks.find(function(x){return x.id===id;});s0=snap();L.tasks=L.tasks.filter(function(x){return x.id!==id;});save();render();showToast('Deleted “'+short(t.t)+'”',s0);return;}
   if(a==='toggledone'){showDone[cur]=!showDone[cur];render();return;}
-  if(a==='cleardone'){L.tasks=L.tasks.filter(function(x){return !x.done;});save();render();return;}
+  if(a==='cleardone'){s0=snap();var nd=L.tasks.length;L.tasks=L.tasks.filter(function(x){return !x.done;});nd-=L.tasks.length;save();render();showToast('Cleared '+nd+' completed task'+(nd===1?'':'s'),s0);return;}
+  if(a==='untick'){s0=snap();var nu=0;L.tasks.forEach(function(x){if(x.done){x.done=false;nu++;}});save();render();showToast('Unticked '+nu+' task'+(nu===1?'':'s'),s0);return;}
   if(a==='rename'){var cl=byId(cur);var h=document.querySelector('h1');h.outerHTML='<form data-form="rename" style="flex:1;display:flex;gap:8px"><input id="rn" class="edit" value="'+esc(cl.name)+'" aria-label="List name"><button class="btn primary" type="submit">Save</button></form>';document.getElementById('rn').focus();return;}
   if(a==='dellist'){confirmDel=true;render();return;}
   if(a==='delcancel'){confirmDel=false;render();return;}
-  if(a==='delconfirm'){S.lists=S.lists.filter(function(x){return x.id!==cur;});cur=(S.lists[0]||{}).id;confirmDel=false;save();render();return;}
+  if(a==='delconfirm'){s0=snap();var dn=byId(cur).name;S.lists=S.lists.filter(function(x){return x.id!==cur;});cur=(S.lists[0]||{}).id;confirmDel=false;save();render();showToast('Deleted list “'+short(dn)+'”',s0);return;}
   if(a==='addlist'){adding=true;render();return;}
   if(a==='canceladd'){adding=false;render();return;}
-  if(a==='export'){exportText=toText();drawer=false;render();try{navigator.clipboard.writeText(exportText).catch(function(){});}catch(x){}var ex=document.getElementById('exp');if(ex){ex.focus();ex.select();ex.scrollIntoView({block:'center'});}return;}
+  if(a==='export'){exportText=toText();drawer=false;view='lists';render();try{navigator.clipboard.writeText(exportText).catch(function(){});}catch(x){}var ex=document.getElementById('exp');if(ex){ex.focus();ex.select();ex.scrollIntoView({block:'center'});}return;}
+  /* settings */
+  if(a==='setsound'){ls(SNDK,b.checked?null:'off');return;}
+  if(a==='setvib'){ls(VIBK,b.checked?null:'off');if(b.checked&&navigator.vibrate){try{navigator.vibrate(30);}catch(x){}}return;}
+  if(a==='pinopen'){sett.pinOpen=true;sett.pinErr='';render();var p=document.getElementById('pin1');if(p)p.focus();return;}
+  if(a==='pincancel'){sett.pinOpen=false;sett.pinErr='';render();return;}
+  if(a==='lockoff'){ls(LOCKK,null);ls(FAILK,null);sett.pinOpen=false;render();showToast('App lock turned off');return;}
+  if(a==='bioon'){sett.bioErr='';bioRegister().then(function(cid){var lk2=lockInfo();if(!lk2)return;lk2.cred=cid;ls(LOCKK,JSON.stringify(lk2));render();showToast('Fingerprint / face unlock is on');}).catch(function(){sett.bioErr='Could not set up fingerprint / face unlock on this device.';render();});return;}
+  if(a==='biooff'){var lk3=lockInfo();if(lk3){delete lk3.cred;ls(LOCKK,JSON.stringify(lk3));}render();return;}
+  if(a==='passopen'){sett.passOpen=true;sett.passErr='';render();var np=document.getElementById('np1');if(np)np.focus();return;}
+  if(a==='passcancel'){sett.passOpen=false;render();return;}
+  if(a==='wipeask'){sett.wipeConfirm=true;sett.wipeMsg='';render();return;}
+  if(a==='wipeno'){sett.wipeConfirm=false;render();return;}
+  if(a==='wipelater'){cloud.offerWipe=false;sett.wipeMsg='';render();return;}
+  if(a==='wipeyes'){doWipe();return;}
+  if(a==='histload'){loadHist();return;}
+  if(a==='histprev'){openVersion(id);return;}
+  if(a==='histclose'){sett.prev=null;render();return;}
+  if(a==='histrestore'){var pv=sett.prev;if(!pv||!pv.state)return;s0=snap();S.lists=JSON.parse(JSON.stringify(pv.state.lists));if(!byId(cur))cur=(S.lists[0]||{}).id;sett.prev=null;view='lists';save();render();showToast('Restored the version from '+fmtDate(pv.date),s0);return;}
 });
 document.addEventListener('submit',function(e){
   var f=e.target.getAttribute('data-form');if(!f)return;e.preventDefault();
@@ -407,8 +759,56 @@ document.addEventListener('submit',function(e){
     });
     return;
   }
+  if(f==='setpass'){
+    var p1=document.getElementById('pp1').value,p2=document.getElementById('pp2').value;
+    if(p1.length<8){cloud.passErr='Use at least 8 characters. A few unrelated words work well.';render();return;}
+    if(p1!==p2){cloud.passErr='The two passphrases do not match.';render();return;}
+    cloud.busy=true;cloud.passErr='';render();
+    makeKey(p1,b64u8(rand(16)),KDF_ITER).then(function(info){ls(KEYK,JSON.stringify(info));keyCache=null;cloud.busy=false;afterPassSet();})
+      .catch(function(){cloud.busy=false;cloud.passErr='This browser could not encrypt. Try another browser.';render();});
+    return;
+  }
+  if(f==='enterpass'){
+    var pe=document.getElementById('pp1').value,o=cloud.passEnc;if(!pe)return;
+    cloud.busy=true;cloud.passErr='';render();
+    var go=o?Promise.resolve(o):window.Cloud.get().then(function(){return null;},function(err){if(err.code==='need-pass')return err.enc;throw err;});
+    go.then(function(enc){
+      if(!enc){cloud.busy=false;cloud.pass=null;render();pull();return;}
+      return makeKey(pe,enc.salt,enc.iter).then(function(info){
+        return decryptWith(enc,info).then(function(){
+          ls(KEYK,JSON.stringify(info));keyCache=null;cloud.busy=false;cloud.pass=null;cloud.passEnc=null;cloud.status='Syncing…';render();pull();
+        },function(){cloud.busy=false;cloud.passErr='That passphrase does not open these lists.';render();});
+      });
+    }).catch(function(err){cloud.busy=false;cloud.passErr=err&&err.code==='network'?'Cannot reach GitHub. Check your connection.':'Something went wrong ('+(err&&err.code)+').';render();});
+    return;
+  }
+  if(f==='unlock'){
+    var lk=lockInfo(),pin=document.getElementById('lock-pin').value,fl=lsJson(FAILK);
+    if(!lk){unlock();return;}
+    if(fl&&fl.until>Date.now()){lockErr='Too many wrong tries. Wait '+Math.ceil((fl.until-Date.now())/1000)+' seconds.';render();return;}
+    if(!pin)return;
+    lockBusy=true;lockErr='';render();
+    hashPin(pin,lk.salt).then(function(hh){lockBusy=false;if(hh===lk.hash)unlock();else{lockFail();render();}});
+    return;
+  }
+  if(f==='setpin'){
+    var a1=document.getElementById('pin1').value,a2=document.getElementById('pin2').value;
+    if(!/^\d{4,}$/.test(a1)){sett.pinErr='Use 4 or more digits.';render();return;}
+    if(a1!==a2){sett.pinErr='The two PINs do not match.';render();return;}
+    var salt=b64u8(rand(16)),old=lockInfo();
+    hashPin(a1,salt).then(function(hh){var n={salt:salt,hash:hh};if(old&&old.cred)n.cred=old.cred;ls(LOCKK,JSON.stringify(n));ls(FAILK,null);sett.pinOpen=false;sett.pinErr='';render();showToast(old?'PIN changed':'App lock is on');});
+    return;
+  }
+  if(f==='changepass'){
+    var n1=document.getElementById('np1').value,n2=document.getElementById('np2').value;
+    if(n1.length<8){sett.passErr='Use at least 8 characters.';render();return;}
+    if(n1!==n2){sett.passErr='The two passphrases do not match.';render();return;}
+    cloud.busy=true;sett.passErr='';render();
+    makeKey(n1,b64u8(rand(16)),KDF_ITER).then(function(info){ls(KEYK,JSON.stringify(info));keyCache=null;cloud.busy=false;sett.passOpen=false;setDirty(true);render();pushNow();showToast('Passphrase changed');});
+    return;
+  }
   if(f==='addtask'){var i=document.getElementById('newtask'),v=i.value.trim();if(!v)return;byId(cur).tasks.push({id:uid(),t:v,done:false});save();focusNew=true;render();}
-  if(f==='addlist'){var n=document.getElementById('nl-name').value.trim(),g=document.getElementById('nl-group').value.trim();if(!n)return;var L={id:uid(),name:n,group:g,tasks:[]};S.lists.push(L);cur=L.id;adding=false;q='';drawer=false;save();focusNew=true;render();}
+  if(f==='addlist'){var n=document.getElementById('nl-name').value.trim(),g=document.getElementById('nl-group').value.trim();if(!n)return;var L={id:uid(),name:n,group:g,tasks:[]};S.lists.push(L);cur=L.id;adding=false;q='';drawer=false;view='lists';save();focusNew=true;render();}
   if(f==='rename'){var v2=document.getElementById('rn').value.trim();if(v2){byId(cur).name=v2;save();}render();}
 });
 document.addEventListener('input',function(e){
@@ -417,7 +817,43 @@ document.addEventListener('input',function(e){
 document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&e.target.id==='edit-input'){e.preventDefault();var b=document.querySelector('[data-act=saveedit]');if(b)b.click();}
   if(e.key==='Escape'&&editing){editing=null;render();}
+  /* keyboard reorder on the grip */
+  if((e.key==='ArrowUp'||e.key==='ArrowDown')&&e.target.classList&&e.target.classList.contains('grip')){
+    e.preventDefault();
+    var id=e.target.getAttribute('data-id'),L=byId(cur),open=L.tasks.filter(function(t){return !t.done;}).map(function(t){return t.id;});
+    var i=open.indexOf(id),j=i+(e.key==='ArrowUp'?-1:1);
+    if(i<0||j<0||j>=open.length)return;
+    open.splice(i,1);open.splice(j,0,id);applyOrder(L,open);save();render();
+    var g=document.querySelector('.grip[data-id="'+id+'"]');if(g)g.focus();
+  }
 });
+/* drag to reorder (mouse or touch) using the grip handle */
+document.addEventListener('pointerdown',function(e){
+  var g=e.target.closest&&e.target.closest('.grip');if(!g||(e.button&&e.button>0))return;
+  e.preventDefault();
+  var li=g.closest('li');
+  drag={id:g.getAttribute('data-id'),li:li,ul:li.parentNode,moved:false,pid:e.pointerId};
+  try{g.setPointerCapture(e.pointerId);}catch(x){}
+  li.classList.add('dragging');
+});
+document.addEventListener('pointermove',function(e){
+  if(!drag||e.pointerId!==drag.pid)return;
+  e.preventDefault();
+  var others=[].filter.call(drag.ul.children,function(x){return x!==drag.li;}),idx=0;
+  others.forEach(function(x){var r=x.getBoundingClientRect();if(e.clientY>r.top+r.height/2)idx++;});
+  var curIdx=[].indexOf.call(drag.ul.children,drag.li);
+  if(idx!==curIdx){drag.ul.insertBefore(drag.li,others[idx]||null);drag.moved=true;}
+  var m=document.getElementById('mainpane');
+  if(m){var mr=m.getBoundingClientRect();if(e.clientY<mr.top+48)m.scrollTop-=12;else if(e.clientY>mr.bottom-48)m.scrollTop+=12;}
+},{passive:false});
+function endDrag(e){
+  if(!drag||(e&&e.pointerId!==drag.pid))return;
+  var d=drag;drag=null;d.li.classList.remove('dragging');
+  if(d.moved){var L=byId(d.ul.getAttribute('data-list'));if(L){applyOrder(L,[].map.call(d.ul.children,function(x){return x.getAttribute('data-id');}));save();}}
+  renderLater=false;render();
+}
+document.addEventListener('pointerup',endDrag);
+document.addEventListener('pointercancel',endDrag);
 document.addEventListener('change',function(e){
   if(e.target.id!=='importfile'||!e.target.files[0])return;
   e.target.files[0].text().then(function(text){
