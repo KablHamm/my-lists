@@ -1,0 +1,34 @@
+# Sends due My Lists reminders as push notifications. See .github/reminders/send_reminders.py.
+# Needs two Actions secrets in this repo: DATA_TOKEN (Contents read/write on the data repo) and VAPID_PRIVATE_KEY.
+name: Send reminders
+on:
+  schedule:
+    - cron: '*/5 * * * *'     # GitHub runs scheduled jobs late at busy times, often by 5-30 minutes
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: write              # only for the daily keep-alive (re-enable this workflow)
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/reminders
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install --quiet cryptography==44.0.0
+      - run: python .github/reminders/send_reminders.py
+        env:
+          DATA_TOKEN: ${{ secrets.DATA_TOKEN }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          DATA_REPO: KablHamm/my-lists-data
+          REMINDERS_PATH: reminders.json
+          VAPID_SUBJECT: https://kablhamm.github.io/my-lists/
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW_REPO: ${{ github.repository }}
