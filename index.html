@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://api.github.com https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Lists</title>
+<meta name="theme-color" content="#0e6b5c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Lists">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: fixed list sidebar on the left, one list open on the right; sidebar becomes a drawer on phones. */
+:root{
+  --bg:#f4f5f2;
+  --surface:#ffffff;
+  --ink:#1c2321;
+  --muted:#667069;
+  --line:#dfe3dd;
+  --accent:#0e6b5c;
+  --accent-ink:#ffffff;
+  --danger:#b3392b;
+  --font-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --font-body:"Figtree","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#141a18;--surface:#1c2421;--ink:#e8ece9;--muted:#93a09a;--line:#2b3531;--accent:#4fc3a8;--accent-ink:#0b1512;--danger:#f08a7c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141a18;--surface:#1c2421;--ink:#e8ece9;--muted:#93a09a;--line:#2b3531;--accent:#4fc3a8;--accent-ink:#0b1512;--danger:#f08a7c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font-body)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#app{display:flex;height:100%}
+.side{width:290px;flex:none;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.brand{font:700 20px var(--font-display);padding:18px 18px 10px;letter-spacing:-.01em}
+.search{padding:0 14px 10px}
+.search input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.lists{flex:1;overflow-y:auto;padding:4px 8px 12px}
+.grp{font:600 12px var(--font-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:14px 10px 4px}
+.item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:8px}
+.item.sub{padding-left:22px}
+.item:hover{background:var(--bg)}
+.item.on{background:var(--accent);color:var(--accent-ink)}
+.item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .ct{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+.item.on .ct{color:var(--accent-ink);opacity:.85}
+.sidefoot{border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--danger)}
+.newlist{display:flex;flex-direction:column;gap:6px}
+.newlist input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+.main{flex:1;min-width:0;overflow-y:auto;padding:24px clamp(16px,4vw,48px) 64px}
+.wrap{max-width:720px;margin:0 auto}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.menu{display:none}
+h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing:-.02em;text-wrap:balance;flex:1}
+.meta{color:var(--muted);margin:2px 0 18px;font-size:14px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.acts .btn{padding:5px 10px;font-size:14px}
+.add{display:flex;gap:8px;margin-bottom:14px}
+.add input{flex:1;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tasks{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.task{display:flex;align-items:flex-start;gap:12px;padding:11px 14px;border-bottom:1px solid var(--line)}
+.task:last-child{border-bottom:0}
+.task input[type=checkbox]{width:19px;height:19px;margin:2px 0 0;accent-color:var(--accent);flex:none}
+.task .tx{flex:1;min-width:0;overflow-wrap:anywhere}
+.task.done .tx{color:var(--muted);text-decoration:line-through}
+.task .src{display:block;font-size:12px;color:var(--muted)}
+.task .row-acts{display:flex;gap:2px;flex:none}
+.ic{border:0;background:none;color:var(--muted);padding:2px 7px;border-radius:6px;font-size:14px}
+.ic:hover{color:var(--ink);background:var(--bg)}
+.edit{flex:1;padding:6px 10px;border:1px solid var(--accent);border-radius:8px;background:var(--bg)}
+.empty{padding:26px 16px;text-align:center;color:var(--muted)}
+.donehead{margin:22px 0 8px;display:flex;align-items:center;gap:10px;color:var(--muted);font-size:14px}
+.donehead button{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline}
+.export{width:100%;height:220px;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+.saved{font-size:12px;color:var(--muted);padding:0 2px}
+.auth{margin:auto;max-width:360px;width:100%;padding:28px 20px;display:flex;flex-direction:column;gap:12px}
+.auth h1{flex:none}
+.auth input{padding:11px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.auth .err{color:var(--danger);font-size:14px;min-height:20px}
+.auth p{color:var(--muted);margin:0}
+.auth label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.auth label input{color:var(--ink);font-size:16px}
+.auth .hint{font-size:13px}
+.import{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.import .err{color:var(--danger);font-size:14px;min-height:20px}
+.linkbtn{border:0;background:none;color:var(--accent);padding:0;text-decoration:underline}
+@media (max-width:760px){
+  .side{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%);transition:transform .2s;width:min(300px,86vw)}
+  .side.open{transform:none;box-shadow:0 0 0 100vmax rgba(0,0,0,.35)}
+  .menu{display:inline-block}
+}
+@media (prefers-reduced-motion:reduce){.side{transition:none}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script id="state" type="application/json">{"rev":0,"lists":[]}</script>
+<script id="code">
+(function(){
+var S=JSON.parse(document.getElementById('state').textContent);
+var LSK='my-lists-state-v1';
+try{var l=JSON.parse(localStorage.getItem(LSK)||'null'); if(l&&l.rev>S.rev) S=l;}catch(e){}
+var cur=(S.lists[0]||{}).id, q='', editing=null, showDone={}, drawer=false, adding=false, confirmDel=false, exportText=null, focusNew=false;
+var cloud={user:null, status:'', authErr:'', busy:false, confirmOut:false, needImport:false, importErr:''}, pushTimer=null, pollTimer=null, inflight=false, again=false;
+function uid(){return Math.random().toString(36).slice(2,9);}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function byId(id){return S.lists.find(function(x){return x.id===id;});}
+function lsSave(){try{localStorage.setItem(LSK,JSON.stringify(S));}catch(e){}}
+
+function save(){
+  S.rev=(S.rev||0)+1; lsSave(); setDirty(true);
+  if(cloud.user){cloud.status='Saving…';paintStatus();clearTimeout(pushTimer);pushTimer=setTimeout(pushNow,1500);}
+}
+function paintStatus(){var e=document.getElementById('status');if(e)e.textContent=cloud.status;}
+
+/* Sync: the lists live as one JSON file in a PRIVATE GitHub repo, read and written with the GitHub
+   contents API using a fine-grained token kept on this device. Each save is a commit (history = backups).
+   Newest rev wins: a write carries the file's last known sha; if someone else saved first GitHub refuses it,
+   we re-read, and keep whichever copy has the higher rev. localStorage keeps a copy so it works offline. */
+var GHK='my-lists-gh', TKK='my-lists-token', DIRTYK='my-lists-dirty', SHAK='my-lists-sha';
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null;}}
+function getCfg(){try{return JSON.parse(ls(GHK)||'null');}catch(e){return null;}}
+function setDirty(v){ls(DIRTYK,v?'1':null);}
+function isDirty(){return ls(DIRTYK)==='1';}
+function codeErr(c){var e=new Error(c);e.code=c;return e;}
+function b64enc(str){var b=new TextEncoder().encode(str),s='';for(var i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(s);}
+function b64dec(b64){var bin=atob(b64.replace(/\s/g,'')),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new TextDecoder().decode(u);}
+function validState(s){return s&&typeof s==='object'&&Array.isArray(s.lists)&&s.lists.every(function(L){return L&&typeof L.id==='string'&&typeof L.name==='string'&&Array.isArray(L.tasks);});}
+window.Cloud=(function(){
+  var authCb=null;
+  function base(){return ls('my-lists-api')||'https://api.github.com';}
+  function enc(p){return String(p).split('/').map(encodeURIComponent).join('/');}
+  function fileUrl(c){return '/repos/'+enc(c.owner)+'/'+enc(c.repo)+'/contents/'+enc(c.path);}
+  function req(method,path,body,tok){
+    var hd={'Authorization':'Bearer '+(tok||ls(TKK)),'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+    if(body)hd['Content-Type']='application/json';
+    return fetch(base()+path,{method:method,cache:'no-store',headers:hd,body:body?JSON.stringify(body):undefined})
+      .catch(function(){throw codeErr('network');})
+      .then(function(r){
+        if(r.status===401)throw codeErr('bad-token');
+        if(r.status===403||r.status===429)throw codeErr(r.headers.get('x-ratelimit-remaining')==='0'?'rate-limit':'forbidden');
+        return r;
+      });
+  }
+  return {
+    onAuth:function(cb){authCb=cb;cb(ls(TKK)&&getCfg()?getCfg():null);},
+    signIn:function(tok,cfg){
+      return req('GET','/repos/'+enc(cfg.owner)+'/'+enc(cfg.repo),null,tok).then(function(r){
+        if(r.status===404)throw codeErr('no-repo');
+        if(!r.ok)throw codeErr('http-'+r.status);
+        return r.json();
+      }).then(function(repo){
+        if(repo.private!==true)throw codeErr('public-repo');
+        ls(TKK,tok);ls(GHK,JSON.stringify(cfg));if(authCb)authCb(cfg);
+      });
+    },
+    signOut:function(){[TKK,LSK,DIRTYK,SHAK].forEach(function(k){ls(k,null);});if(authCb)authCb(null);},
+    /* resolves null when the file does not exist yet, else {state, sha} */
+    get:function(){
+      return req('GET',fileUrl(getCfg())).then(function(r){
+        if(r.status===404)return null;
+        if(!r.ok)throw codeErr('http-'+r.status);
+        return r.json().then(function(j){var s;try{s=JSON.parse(b64dec(j.content));}catch(e){throw codeErr('bad-file');}if(!validState(s))throw codeErr('bad-file');return {state:s,sha:j.sha};});
+      });
+    },
+    /* resolves {sha} when saved, {conflict:true} when the file changed since `sha` */
+    push:function(state,sha){
+      var body={message:'Update lists (rev '+state.rev+')',content:b64enc(JSON.stringify(state,null,1))};if(sha)body.sha=sha;
+      return req('PUT',fileUrl(getCfg()),body).then(function(r){
+        if(r.status===409||r.status===422)return {conflict:true};
+        if(!r.ok)throw codeErr('http-'+r.status);
+        return r.json().then(function(j){return {sha:j.content.sha};});
+      });
+    }
+  };
+})();
+function applyRemote(remote,sha){
+  S=remote; lsSave(); ls(SHAK,sha); setDirty(false); cloud.needImport=false;
+  if(!byId(cur))cur=(S.lists[0]||{}).id;
+  editing=null; confirmDel=false; render();
+}
+function pushNow(tries){
+  clearTimeout(pushTimer); pushTimer=null;
+  if(!cloud.user||S.rev<1)return;
+  if(inflight){again=true;return;}
+  inflight=true; tries=tries||0; var sent=S.rev;
+  window.Cloud.push(S,ls(SHAK)).then(function(res){
+    if(!res.conflict){
+      inflight=false; ls(SHAK,res.sha); if(S.rev===sent)setDirty(false);
+      cloud.status='Synced'; paintStatus();
+      if(again){again=false;if(isDirty())pushNow();}
+      return;
+    }
+    return window.Cloud.get().then(function(f){
+      inflight=false;
+      if(f&&f.state.rev>=S.rev){again=false;applyRemote(f.state,f.sha);cloud.status='Synced: loaded a newer copy from another device';paintStatus();return;}
+      ls(SHAK,f?f.sha:null);
+      if(tries<3)pushNow(tries+1);else{cloud.status='Could not save yet: will retry';paintStatus();}
+    });
+  }).catch(function(err){inflight=false;again=false;syncFail(err);});
+}
+function syncFail(err){
+  var c=err&&err.code;
+  if(c==='bad-token'){ls(TKK,null);cloud.user=null;cloud.authErr='GitHub no longer accepts the token (expired or revoked). Enter a new one.';stopPoll();render();return;}
+  cloud.status=c==='network'?'Offline: changes are saved on this device':c==='rate-limit'?'GitHub rate limit reached: will retry':c==='forbidden'?'GitHub refused the save: check the token has Contents read and write':'Sync problem ('+c+'): changes are saved on this device';
+  paintStatus();
+}
+function pull(){
+  if(!cloud.user||pushTimer||inflight)return;
+  window.Cloud.get().then(function(f){
+    if(!f){if(S.rev>=1){ls(SHAK,null);pushNow();}else{cloud.needImport=true;cloud.status='';render();}return;}
+    if(isDirty()){pushNow();return;}
+    if(f.state.rev>S.rev)applyRemote(f.state,f.sha);
+    else if(f.state.rev===S.rev)ls(SHAK,f.sha);
+    cloud.status='Synced'; paintStatus();
+  }).catch(syncFail);
+}
+function stopPoll(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+function startSync(cfg){
+  cloud.user=cfg; cloud.authErr=''; cloud.status='Syncing…';
+  stopPoll(); pollTimer=setInterval(function(){if(document.visibilityState==='visible')pull();},30000);
+  render(); pull();
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible')pull();
+  else if(pushTimer)pushNow();
+});
+window.addEventListener('online',function(){if(isDirty())pushNow();else pull();});
+function initCloud(){
+  window.Cloud.onAuth(function(cfg){
+    if(cfg){startSync(cfg);}
+    else{cloud.user=null;stopPoll();render();}
+  });
+}
+function importText(text){
+  var s;
+  if(/<script id="state"/.test(text)){var el=new DOMParser().parseFromString(text,'text/html').getElementById('state');s=JSON.parse(el?el.textContent:'null');}
+  else s=JSON.parse(text);
+  if(!validState(s)||!s.lists.length)throw new Error('no lists');
+  s.rev=Math.max(s.rev|0,1); return s;
+}
+
+function openCount(L){return L.tasks.filter(function(t){return !t.done;}).length;}
+function sideHtml(){
+  var out='',seen={};
+  S.lists.forEach(function(L){
+    if(L.group){
+      if(seen[L.group])return; seen[L.group]=1;
+      out+='<div class="grp">'+esc(L.group)+'</div>';
+      S.lists.filter(function(x){return x.group===L.group;}).forEach(function(x){out+=itemHtml(x,true);});
+    } else out+=itemHtml(L,false);
+  });
+  return out;
+}
+function itemHtml(L,sub){
+  return '<button class="item'+(sub?' sub':'')+(L.id===cur&&!q?' on':'')+'" data-act="pick" data-id="'+L.id+'"><span class="nm">'+esc(L.name)+'</span><span class="ct">'+(openCount(L)||'')+'</span></button>';
+}
+function taskHtml(L,t,showSrc){
+  if(editing===t.id){
+    return '<li class="task"><input class="edit" id="edit-input" value="'+esc(t.t)+'" data-id="'+t.id+'" aria-label="Edit task"><div class="row-acts"><button class="ic" data-act="saveedit" data-list="'+L.id+'" data-id="'+t.id+'">Save</button><button class="ic" data-act="canceledit">Cancel</button></div></li>';
+  }
+  return '<li class="task'+(t.done?' done':'')+'"><input type="checkbox" '+(t.done?'checked ':'')+'data-act="toggle" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Mark done"><div class="tx">'+esc(t.t)+(showSrc?'<span class="src">'+esc((L.group?L.group+' / ':'')+L.name)+'</span>':'')+'</div><div class="row-acts"><button class="ic" data-act="edit" data-id="'+t.id+'" aria-label="Edit task">Edit</button><button class="ic" data-act="deltask" data-list="'+L.id+'" data-id="'+t.id+'" aria-label="Delete task">Delete</button></div></li>';
+}
+function mainHtml(){
+  var h='<div class="wrap">';
+  if(q){
+    var ql=q.toLowerCase(),res=[];
+    S.lists.forEach(function(L){L.tasks.forEach(function(t){if(t.t.toLowerCase().indexOf(ql)>-1)res.push([L,t]);});});
+    h+='<div class="top"><button class="btn menu" data-act="drawer" aria-label="Show lists">Lists</button><h1>Search</h1></div><p class="meta">'+res.length+' match'+(res.length===1?'':'es')+' for “'+esc(q)+'”</p>';
+    h+=res.length?'<ul class="tasks">'+res.map(function(r){return taskHtml(r[0],r[1],true);}).join('')+'</ul>':'<div class="tasks"><div class="empty">Nothing matches.</div></div>';
+    return h+'</div>';
+  }
+  if(cloud.needImport&&S.rev<1){var c=cloud.user;return h+'<div class="top"><h1>Import your lists</h1></div><div class="import"><p class="meta" style="margin:0">'+esc(c.path)+' is not in '+esc(c.owner+'/'+c.repo)+' yet. Choose your old my-lists.html (or a lists .json file) and it will be saved there.</p><input type="file" id="importfile" accept=".html,.htm,.json" aria-label="Lists file"><div class="err" role="alert">'+esc(cloud.importErr)+'</div></div></div>';}
+  var L=byId(cur);
+  if(!L){return h+'<div class="empty">No list selected.</div></div>';}
+  var open=L.tasks.filter(function(t){return !t.done;}),done=L.tasks.filter(function(t){return t.done;});
+  h+='<div class="top"><button class="btn menu" data-act="drawer" aria-label="Show lists">Lists</button><h1>'+esc(L.name)+'</h1></div>';
+  h+='<p class="meta">'+(L.group?esc(L.group)+' · ':'')+open.length+' open'+(done.length?' · '+done.length+' done':'')+'</p>';
+  h+='<div class="acts"><button class="btn" data-act="rename">Rename list</button>'+
+     (confirmDel?'<button class="btn danger" data-act="delconfirm">Confirm delete list</button><button class="btn" data-act="delcancel">Keep it</button>':'<button class="btn danger" data-act="dellist">Delete list</button>')+
+     (done.length?'<button class="btn" data-act="cleardone">Clear completed</button>':'')+'</div>';
+  h+='<form class="add" data-form="addtask"><input id="newtask" placeholder="Add a task" autocomplete="off" aria-label="New task"><button class="btn primary" type="submit">Add</button></form>';
+  h+=open.length?'<ul class="tasks">'+open.map(function(t){return taskHtml(L,t);}).join('')+'</ul>':'<div class="tasks"><div class="empty">'+(L.tasks.length?'All done.':'This list is empty.')+'</div></div>';
+  if(done.length){
+    h+='<div class="donehead"><span>Completed ('+done.length+')</span><button data-act="toggledone">'+(showDone[L.id]?'Hide':'Show')+'</button></div>';
+    if(showDone[L.id])h+='<ul class="tasks">'+done.map(function(t){return taskHtml(L,t);}).join('')+'</ul>';
+  }
+  return h+'</div>';
+}
+function defaultOwner(){return /\.github\.io$/.test(location.hostname)?location.hostname.split('.')[0]:'';}
+function authHtml(){
+  var c=getCfg()||{owner:defaultOwner(),repo:'my-lists-data',path:'lists.json'};
+  function f(id,label,v){return '<label>'+label+'<input id="'+id+'" value="'+esc(v)+'" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>';}
+  return '<form class="auth" data-form="auth"><h1>My Lists</h1><p>Connect to the private GitHub repo that holds your lists.</p>'+
+    f('gh-owner','GitHub owner',c.owner)+f('gh-repo','Private repo',c.repo)+f('gh-path','File in the repo',c.path)+
+    '<input type="text" name="username" value="my-lists-github" autocomplete="username" hidden>'+
+    '<label>Access token<input id="au-pw" type="password" autocomplete="current-password" placeholder="github_pat_…" required></label>'+
+    '<div class="err" id="au-err" role="alert">'+esc(cloud.authErr)+'</div>'+
+    '<button class="btn primary" type="submit"'+(cloud.busy?' disabled':'')+'>'+(cloud.busy?'Checking…':'Connect')+'</button>'+
+    '<p class="hint">Use a fine-grained token that can only see this repo, with Contents: Read and write. It stays on this device.</p></form>';
+}
+function render(){
+  var app=document.getElementById('app');
+  if(!cloud.user){app.innerHTML=authHtml();var pw=document.getElementById('au-pw');if(pw&&!cloud.busy)pw.focus();return;}
+  var total=S.lists.reduce(function(n,L){return n+openCount(L);},0);
+  app.innerHTML='<aside class="side'+(drawer?' open':'')+'" id="side"><div class="brand">My Lists</div>'+
+    '<div class="search"><input id="search" type="search" placeholder="Search all '+total+' tasks" value="'+esc(q)+'" aria-label="Search tasks"></div>'+
+    '<nav class="lists">'+sideHtml()+'</nav><div class="sidefoot">'+
+    (adding?'<form class="newlist" data-form="addlist"><input id="nl-name" placeholder="List name" aria-label="List name" autocomplete="off"><input id="nl-group" list="groups" placeholder="Group (optional)" aria-label="Group" autocomplete="off"><datalist id="groups">'+Object.keys(S.lists.reduce(function(m,L){if(L.group)m[L.group]=1;return m;},{})).map(function(g){return '<option value="'+esc(g)+'">';}).join('')+'</datalist><div style="display:flex;gap:8px"><button class="btn primary" type="submit">Create list</button><button class="btn" type="button" data-act="canceladd">Cancel</button></div></form>':'<button class="btn primary" data-act="addlist">New list</button>')+
+    '<button class="btn" data-act="export">Copy everything as text</button>'+
+    (cloud.confirmOut?'<button class="btn danger" data-act="signoutyes">'+(isDirty()?'Sign out: unsynced changes will be lost':'Sign out and remove lists from this device')+'</button><button class="btn" data-act="signoutno">Stay signed in</button>':'<button class="btn" data-act="signout">Sign out</button>')+
+    '<span class="saved" id="status">'+esc(cloud.status)+'</span></div></aside>'+
+    '<main class="main" id="mainpane">'+mainHtml()+(exportText!==null?'<div class="wrap"><textarea class="export" id="exp" readonly aria-label="All lists as text">'+esc(exportText)+'</textarea></div>':'')+'</main>';
+  if(focusNew){var n=document.getElementById('newtask');if(n)n.focus();focusNew=false;}
+  var ei=document.getElementById('edit-input');if(ei){ei.focus();ei.setSelectionRange(ei.value.length,ei.value.length);}
+  var nl=document.getElementById('nl-name');if(nl&&adding)nl.focus();
+}
+function toText(){
+  return S.lists.map(function(L){return (L.group?L.group+' / ':'')+L.name+'\n'+(L.tasks.length?L.tasks.map(function(t){return (t.done?'[x] ':'[ ] ')+t.t;}).join('\n'):'(empty)');}).join('\n\n');
+}
+document.addEventListener('click',function(e){
+  var b=e.target.closest('[data-act]');if(!b)return;
+  var a=b.getAttribute('data-act'),id=b.getAttribute('data-id'),lid=b.getAttribute('data-list');
+  var L=lid?byId(lid):byId(cur);
+  if(a==='signout'){cloud.confirmOut=true;render();return;}
+  if(a==='signoutno'){cloud.confirmOut=false;render();return;}
+  if(a==='signoutyes'){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;cloud.status='';cloud.needImport=false;window.Cloud.signOut();return;}
+  if(a==='toggle'){var t=L.tasks.find(function(x){return x.id===id;});t.done=!t.done;save();render();return;}
+  if(a==='pick'){cur=id;q='';confirmDel=false;drawer=false;exportText=null;render();return;}
+  if(a==='drawer'){drawer=!drawer;render();return;}
+  if(a==='edit'){editing=id;render();return;}
+  if(a==='canceledit'){editing=null;render();return;}
+  if(a==='saveedit'){var v=document.getElementById('edit-input').value.trim();if(v){L.tasks.find(function(x){return x.id===id;}).t=v;save();}editing=null;render();return;}
+  if(a==='deltask'){L.tasks=L.tasks.filter(function(x){return x.id!==id;});save();render();return;}
+  if(a==='toggledone'){showDone[cur]=!showDone[cur];render();return;}
+  if(a==='cleardone'){L.tasks=L.tasks.filter(function(x){return !x.done;});save();render();return;}
+  if(a==='rename'){var cl=byId(cur);var h=document.querySelector('h1');h.outerHTML='<form data-form="rename" style="flex:1;display:flex;gap:8px"><input id="rn" class="edit" value="'+esc(cl.name)+'" aria-label="List name"><button class="btn primary" type="submit">Save</button></form>';document.getElementById('rn').focus();return;}
+  if(a==='dellist'){confirmDel=true;render();return;}
+  if(a==='delcancel'){confirmDel=false;render();return;}
+  if(a==='delconfirm'){S.lists=S.lists.filter(function(x){return x.id!==cur;});cur=(S.lists[0]||{}).id;confirmDel=false;save();render();return;}
+  if(a==='addlist'){adding=true;render();return;}
+  if(a==='canceladd'){adding=false;render();return;}
+  if(a==='export'){exportText=toText();drawer=false;render();try{navigator.clipboard.writeText(exportText).catch(function(){});}catch(x){}var ex=document.getElementById('exp');if(ex){ex.focus();ex.select();ex.scrollIntoView({block:'center'});}return;}
+});
+document.addEventListener('submit',function(e){
+  var f=e.target.getAttribute('data-form');if(!f)return;e.preventDefault();
+  if(f==='auth'){
+    var tok=document.getElementById('au-pw').value.trim();
+    var cfg={owner:document.getElementById('gh-owner').value.trim(),repo:document.getElementById('gh-repo').value.trim(),path:document.getElementById('gh-path').value.trim().replace(/^\/+/,'')};
+    if(!tok||!cfg.owner||!cfg.repo||!cfg.path)return;
+    cloud.busy=true;cloud.authErr='';render();
+    window.Cloud.signIn(tok,cfg).then(function(){cloud.busy=false;}).catch(function(err){
+      cloud.busy=false;var c=(err&&err.code)||'';
+      cloud.authErr=c==='bad-token'?'GitHub did not accept that token.':c==='no-repo'?'Repo not found, or the token cannot see it.':c==='public-repo'?'That repo is public. Make it private first: your lists include health notes.':c==='forbidden'?'GitHub refused access. Check the token can see this repo.':c==='rate-limit'?'GitHub rate limit reached. Try again later.':c==='network'?'Cannot reach GitHub. Check your connection.':'Could not connect ('+c+').';
+      ls(GHK,JSON.stringify(cfg));  /* remember what was typed (not secret) so the form keeps it */
+      render();
+    });
+    return;
+  }
+  if(f==='addtask'){var i=document.getElementById('newtask'),v=i.value.trim();if(!v)return;byId(cur).tasks.push({id:uid(),t:v,done:false});save();focusNew=true;render();}
+  if(f==='addlist'){var n=document.getElementById('nl-name').value.trim(),g=document.getElementById('nl-group').value.trim();if(!n)return;var L={id:uid(),name:n,group:g,tasks:[]};S.lists.push(L);cur=L.id;adding=false;q='';drawer=false;save();focusNew=true;render();}
+  if(f==='rename'){var v2=document.getElementById('rn').value.trim();if(v2){byId(cur).name=v2;save();}render();}
+});
+document.addEventListener('input',function(e){
+  if(e.target.id==='search'){q=e.target.value;var pos=e.target.selectionStart;render();var s=document.getElementById('search');s.focus();s.setSelectionRange(pos,pos);}
+});
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&e.target.id==='edit-input'){e.preventDefault();var b=document.querySelector('[data-act=saveedit]');if(b)b.click();}
+  if(e.key==='Escape'&&editing){editing=null;render();}
+});
+document.addEventListener('change',function(e){
+  if(e.target.id!=='importfile'||!e.target.files[0])return;
+  e.target.files[0].text().then(function(text){
+    var s;try{s=importText(text);}catch(x){cloud.importErr='That file has no lists in it.';render();return;}
+    S=s;cur=(S.lists[0]||{}).id;cloud.needImport=false;cloud.importErr='';lsSave();setDirty(true);ls(SHAK,null);render();pushNow();
+  });
+});
+initCloud();
+})();
+</script>
+<script>
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol)){navigator.serviceWorker.register('sw.js').catch(function(){});}
+</script>
+</body>
+</html>
