@@ -62,6 +62,7 @@ button{cursor:pointer}
 .item .ct{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
 .item.on .ct{color:var(--accent-ink);opacity:.85}
 .sidefoot{border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.ver{color:var(--muted);font-size:12px;text-align:center;margin:0}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px}
 .btn:hover{border-color:var(--accent)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -308,6 +309,8 @@ function mainHtml(){
   }
   return h+'</div>';
 }
+/* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
+var APP_VERSION='1.1.0';
 function defaultOwner(){return /\.github\.io$/.test(location.hostname)?location.hostname.split('.')[0]:'';}
 function authHtml(){
   var c=getCfg()||{owner:defaultOwner(),repo:'my-lists-data',path:'lists.json'};
@@ -318,7 +321,7 @@ function authHtml(){
     '<label>Access token<input id="au-pw" type="password" autocomplete="current-password" placeholder="github_pat_…" required></label>'+
     '<div class="err" id="au-err" role="alert">'+esc(cloud.authErr)+'</div>'+
     '<button class="btn primary" type="submit"'+(cloud.busy?' disabled':'')+'>'+(cloud.busy?'Checking…':'Connect')+'</button>'+
-    '<p class="hint">Use a fine-grained token that can only see this repo, with Contents: Read and write. It stays on this device.</p></form>';
+    '<p class="hint">Use a fine-grained token that can only see this repo, with Contents: Read and write. It stays on this device.</p><p class="ver" id="app-version">Version '+APP_VERSION+'</p></form>';
 }
 function render(){
   var app=document.getElementById('app');
@@ -330,7 +333,7 @@ function render(){
     (adding?'<form class="newlist" data-form="addlist"><input id="nl-name" placeholder="List name" aria-label="List name" autocomplete="off"><input id="nl-group" list="groups" placeholder="Group (optional)" aria-label="Group" autocomplete="off"><datalist id="groups">'+Object.keys(S.lists.reduce(function(m,L){if(L.group)m[L.group]=1;return m;},{})).map(function(g){return '<option value="'+esc(g)+'">';}).join('')+'</datalist><div style="display:flex;gap:8px"><button class="btn primary" type="submit">Create list</button><button class="btn" type="button" data-act="canceladd">Cancel</button></div></form>':'<button class="btn primary" data-act="addlist">New list</button>')+
     '<button class="btn" data-act="export">Copy everything as text</button>'+
     (cloud.confirmOut?'<button class="btn danger" data-act="signoutyes">'+(isDirty()?'Sign out: unsynced changes will be lost':'Sign out and remove lists from this device')+'</button><button class="btn" data-act="signoutno">Stay signed in</button>':'<button class="btn" data-act="signout">Sign out</button>')+
-    '<span class="saved" id="status">'+esc(cloud.status)+'</span></div></aside>'+
+    '<span class="saved" id="status">'+esc(cloud.status)+'</span><span class="ver" id="app-version">Version '+APP_VERSION+'</span></div></aside>'+
     '<main class="main" id="mainpane">'+mainHtml()+(exportText!==null?'<div class="wrap"><textarea class="export" id="exp" readonly aria-label="All lists as text">'+esc(exportText)+'</textarea></div>':'')+'</main>';
   if(focusNew){var n=document.getElementById('newtask');if(n)n.focus();focusNew=false;}
   var ei=document.getElementById('edit-input');if(ei){ei.focus();ei.setSelectionRange(ei.value.length,ei.value.length);}
