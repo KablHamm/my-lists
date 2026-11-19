@@ -1,6 +1,6 @@
 /* My Lists service worker: caches the app shell so it opens offline.
    Data requests (fetch() calls to GitHub) are never touched; list data lives in the page's localStorage copy and the private repo. */
-const CACHE = 'my-lists-v2';
+const CACHE = 'my-lists-v3';
 const SHELL = ['./', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
