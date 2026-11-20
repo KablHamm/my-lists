@@ -170,7 +170,10 @@ h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing
 <script id="code">
 (function(){
 /* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
-var APP_VERSION='1.3.0';
+var APP_VERSION='1.3.1';
+/* Push notifications are built but switched off for now (calendar reminders only). Set to true to bring them back;
+   the GitHub job (.github/workflows/reminders.yml) also needs enabling and a valid DATA_TOKEN secret. */
+var PUSH_ON=false;
 var S=JSON.parse(document.getElementById('state').textContent);
 var LSK='my-lists-state-v1';
 try{var l=JSON.parse(localStorage.getItem(LSK)||'null'); if(l&&l.rev>S.rev) S=l;}catch(e){}
@@ -185,7 +188,7 @@ function lsSave(){try{localStorage.setItem(LSK,JSON.stringify(S));}catch(e){}}
 
 function save(){
   S.rev=(S.rev||0)+1; lsSave(); setDirty(true);
-  if(cloud.user){cloud.status='Saving…';paintStatus();clearTimeout(pushTimer);pushTimer=setTimeout(pushNow,1500);scheduleRem();}
+  if(cloud.user){cloud.status='Saving…';paintStatus();clearTimeout(pushTimer);pushTimer=setTimeout(pushNow,1500);if(PUSH_ON)scheduleRem();}
 }
 function paintStatus(){var e=document.getElementById('status');if(e)e.textContent=cloud.status;}
 
@@ -552,6 +555,10 @@ function loadPushInfo(){
 }
 function ago(iso){var m=Math.round((Date.now()-new Date(iso).getTime())/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago';}
 function remindersCard(){
+  if(!PUSH_ON)return '<section class="card" id="reminders-card"><h2>Reminders</h2>'+
+    '<p>Give a task a due date with Edit, then tap <strong>Add to calendar</strong>. Your phone\'s calendar alerts you at the due time, or at 9:00 if there\'s no time.</p>'+
+    '<label class="row"><input type="checkbox" id="set-calnames" data-act="setcalnames"'+(S.prefs&&S.prefs.calNames?' checked':'')+'> Use the task name as the calendar event title (otherwise "My Lists reminder")</label>'+
+    '<p class="small">Changing a task later does not change the calendar event: edit or delete it in your calendar.</p></section>';
   var me=myDevice(),f=push.file,devs=f&&f.devices||{},ids=Object.keys(devs),onHere=!!(me&&devs[me.id]),prefs=S.prefs||{};
   var h='<section class="card" id="reminders-card"><h2>Reminders</h2>'+
     '<p>Give a task a due date with Edit. <strong>Add to calendar</strong> makes an event your phone\'s calendar will alert you for. Notifications come from a GitHub job that checks every 5 minutes, and can arrive up to about 30 minutes late.</p>'+
@@ -692,7 +699,7 @@ function taskHtml(L,t,showSrc,grip){
       '<input class="edit" id="edit-input" value="'+esc(t.t)+'" data-id="'+t.id+'" aria-label="Task">'+
       '<textarea class="edit" id="edit-note" placeholder="Notes (optional)" aria-label="Notes">'+esc(t.n||'')+'</textarea>'+
       '<div class="when"><label>Due date<input type="date" id="edit-date" value="'+esc(t.d||'')+'"></label><label>Time (optional)<input type="time" id="edit-time" value="'+esc(t.tm||'')+'"></label></div>'+
-      '<label class="chk"><input type="checkbox" id="edit-rem"'+(t.rem?' checked':'')+'> Send a notification when it is due'+(t.tm?'':' (9:00 if no time)')+'</label>'+
+      (PUSH_ON?'<label class="chk"><input type="checkbox" id="edit-rem"'+(t.rem?' checked':'')+'> Send a notification when it is due'+(t.tm?'':' (9:00 if no time)')+'</label>':'<p class="small">Tap Add to calendar to get an alert on your phone at the due time'+(t.tm?'':' (9:00 if no time)')+'.</p>')+
       '<label>List<select id="edit-move">'+S.lists.map(function(x){return '<option value="'+x.id+'"'+(x.id===L.id?' selected':'')+'>'+esc(listLabel(x))+'</option>';}).join('')+'</select></label>'+
       '<p class="err" id="edit-err" role="alert"></p>'+
       '<div class="btns"><button class="btn primary" data-act="saveedit" data-list="'+L.id+'" data-id="'+t.id+'">Save</button><button class="btn" data-act="ics" data-list="'+L.id+'" data-id="'+t.id+'">Add to calendar</button><button class="btn" data-act="canceledit">Cancel</button></div></div></li>';
@@ -971,7 +978,7 @@ document.addEventListener('click',function(e){
     downloadFile('reminder.ics',icsText(tt,L),'text/calendar;charset=utf-8');
     showToast('Calendar event made: open it to add it to your calendar');return;
   }
-  if(a==='settings'){view='settings';q='';drawer=false;exportText=null;editing=null;push.file=null;render();loadPushInfo();return;}
+  if(a==='settings'){view='settings';q='';drawer=false;exportText=null;editing=null;push.file=null;render();if(PUSH_ON)loadPushInfo();return;}
   if(a==='pushon'){enablePush();return;}
   if(a==='pushoff'){removeDevice(id);return;}
   if(a==='pushtest'){testPush();return;}
@@ -982,7 +989,7 @@ document.addEventListener('click',function(e){
   if(a==='saveedit'){
     t=L.tasks.find(function(x){return x.id===id;});
     var v=document.getElementById('edit-input').value.trim(),nt=document.getElementById('edit-note').value.replace(/\s+$/,''),mv=document.getElementById('edit-move').value;
-    var dd=document.getElementById('edit-date').value,dt=document.getElementById('edit-time').value,dr=document.getElementById('edit-rem').checked;
+    var dd=document.getElementById('edit-date').value,dt=document.getElementById('edit-time').value,er=document.getElementById('edit-rem'),dr=er?er.checked:!!t.rem;
     if(!dd&&(dt||dr)){document.getElementById('edit-err').textContent='Pick a due date first.';return;}
     var target=byId(mv)||L, changed=false; s0=snap();
     if(v&&v!==t.t){t.t=v;changed=true;}
