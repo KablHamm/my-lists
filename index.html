@@ -172,7 +172,7 @@ h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing
 <script id="code">
 (function(){
 /* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
-var APP_VERSION='1.4.0';
+var APP_VERSION='1.4.1';
 /* Push notifications are built but switched off for now (calendar reminders only). Set to true to bring them back;
    the GitHub job (.github/workflows/reminders.yml) also needs enabling and a valid DATA_TOKEN secret. */
 var PUSH_ON=false;
@@ -760,7 +760,8 @@ function mainHtml(){
   }
   if(view==='settings')return h+settingsHtml()+'</div>';
   if(view==='due')return h+dueHtml()+'</div>';
-  if(cloud.needImport&&S.rev<1){var c=cloud.user;return h+'<div class="top"><h1>Import your lists</h1></div><div class="import"><p class="meta" style="margin:0">'+esc(c.path)+' is not in '+esc(c.owner+'/'+c.repo)+' yet. Choose your old my-lists.html (or a lists .json file) and it will be encrypted and saved there.</p><input type="file" id="importfile" accept=".html,.htm,.json" aria-label="Lists file"><div class="err" role="alert">'+esc(cloud.importErr)+'</div></div></div>';}
+  if(cloud.needImport&&S.rev<1){var c=cloud.user;return h+'<div class="top"><h1>Import your lists</h1></div><div class="import"><p class="meta" style="margin:0">'+esc(c.path)+' is not in '+esc(c.owner+'/'+c.repo)+' yet. Choose your old my-lists.html (or a lists .json file) and it will be encrypted and saved there.</p><input type="file" id="importfile" accept=".html,.htm,.json" aria-label="Lists file"><div class="err" role="alert">'+esc(cloud.importErr)+'</div>'+
+    '<p class="meta" style="margin:0">Or start fresh with one empty list and add your own.</p><div class="btns"><button class="btn primary" id="start-empty" data-act="startempty">Start with an empty list</button></div></div></div>';}
   h+=wipeBanner();
   var L=byId(cur);
   if(!L){return h+'<div class="empty">No list selected.</div></div>';}
@@ -1034,6 +1035,12 @@ document.addEventListener('click',function(e){
   var a=b.getAttribute('data-act'),id=b.getAttribute('data-id'),lid=b.getAttribute('data-list');
   var L=lid?byId(lid):byId(cur), s0, t;
   if(a==='signout'){cloud.confirmOut=true;render();return;}
+  if(a==='startempty'){
+    if(!(cloud.needImport&&S.rev<1))return;
+    S={rev:1,lists:[{id:uid(),name:'My list',group:'',tasks:[]}]};cur=S.lists[0].id;cloud.needImport=false;cloud.importErr='';
+    lsSave();setDirty(true);ls(SHAK,null);focusNew=true;render();pushNow();
+    showToast('Ready. Rename the list or add more with New list.');return;
+  }
   if(a==='acctmenu'){acctMenu=!acctMenu;render();return;}
   if(a==='acctswitch'){if(id!==ACC.active)switchAccount(id);else{acctMenu=false;render();}return;}
   if(a==='acctadd'){addAccount();return;}
