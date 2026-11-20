@@ -62,6 +62,8 @@ button{cursor:pointer}
 .item .ct{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
 .item.on .ct{color:var(--accent-ink);opacity:.85}
 .sidefoot{border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.brand .acct{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:2px 10px;font:600 13px var(--font-body);margin-left:6px;vertical-align:middle;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acctmenu{margin:0 12px 10px;border:1px solid var(--line);border-radius:10px;padding:4px;background:var(--surface)}
 .sidefoot .pair{display:flex;gap:8px}
 .sidefoot .pair .btn{flex:1}
 .ver{color:var(--muted);font-size:12px;text-align:center;margin:0}
@@ -170,12 +172,24 @@ h1{font:700 clamp(26px,4vw,34px)/1.1 var(--font-display);margin:0;letter-spacing
 <script id="code">
 (function(){
 /* App version. When changing the page, bump this AND the CACHE name in sw.js to match (the test checks they agree). */
-var APP_VERSION='1.3.1';
+var APP_VERSION='1.4.0';
 /* Push notifications are built but switched off for now (calendar reminders only). Set to true to bring them back;
    the GitHub job (.github/workflows/reminders.yml) also needs enabling and a valid DATA_TOKEN secret. */
 var PUSH_ON=false;
 var S=JSON.parse(document.getElementById('state').textContent);
-var LSK='my-lists-state-v1';
+/* Accounts: separate sets of lists on this device, each with its own repo/file, token, passphrase key and local copy.
+   The first account keeps the original storage names; others add '@<id>'. Switching reloads the page. App lock,
+   sound and vibration are device-wide. */
+var ACCTK='my-lists-accounts';
+function acctLoad(){try{var a=JSON.parse(localStorage.getItem(ACCTK)||'null');if(a&&Array.isArray(a.list)&&a.list.length)return a;}catch(e){}return {active:'',list:[{id:'',label:'Account 1'}]};}
+var ACC=acctLoad();
+if(!ACC.list.some(function(x){return x.id===ACC.active;}))ACC.active=ACC.list[0].id;
+function keyFor(base,id){return base+(id?'@'+id:'');}
+var SUF=ACC.active?'@'+ACC.active:'';
+var ACCT_KEYS=['my-lists-state-v1','my-lists-token','my-lists-dirty','my-lists-sha','my-lists-key','my-lists-device'];
+function saveAccts(){try{if(ACC.list.length===1&&ACC.list[0].id===''&&ACC.list[0].label==='Account 1')localStorage.removeItem(ACCTK);else localStorage.setItem(ACCTK,JSON.stringify(ACC));}catch(e){}}
+function curAcct(){return ACC.list.find(function(x){return x.id===ACC.active;});}
+var LSK='my-lists-state-v1'+SUF;
 try{var l=JSON.parse(localStorage.getItem(LSK)||'null'); if(l&&l.rev>S.rev) S=l;}catch(e){}
 var cur=(S.lists[0]||{}).id, q='', editing=null, showDone={}, drawer=false, adding=false, confirmDel=false, exportText=null, focusNew=false, view='lists';
 var cloud={user:null, status:'', authErr:'', busy:false, confirmOut:false, needImport:false, importErr:'', pass:null, passErr:'', passEnc:null, passRemote:null, encrypting:false, offerWipe:false},
@@ -198,7 +212,7 @@ function paintStatus(){var e=document.getElementById('status');if(e)e.textConten
    we re-read, and keep whichever copy has the higher rev. localStorage keeps a copy so it works offline.
    Encryption: the file is AES-GCM encrypted with a key derived (PBKDF2-SHA256) from the user's passphrase.
    The derived key is kept on each device (like the token); the passphrase itself is never stored. */
-var GHK='my-lists-gh', TKK='my-lists-token', DIRTYK='my-lists-dirty', SHAK='my-lists-sha', KEYK='my-lists-key',
+var GHK='my-lists-gh'+SUF, TKK='my-lists-token'+SUF, DIRTYK='my-lists-dirty'+SUF, SHAK='my-lists-sha'+SUF, KEYK='my-lists-key'+SUF,
     LOCKK='my-lists-lock', FAILK='my-lists-lockfails', SNDK='my-lists-sound', VIBK='my-lists-vibrate';
 var KDF_ITER=600000, PIN_ITER=150000;
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null;}}
@@ -276,7 +290,24 @@ window.Cloud=(function(){
         ls(TKK,tok);ls(GHK,JSON.stringify(cfg));if(authCb)authCb(cfg);
       });
     },
-    signOut:function(){[TKK,LSK,DIRTYK,SHAK,KEYK,LOCKK,FAILK,'my-lists-device'].forEach(function(k){ls(k,null);});keyCache=null;if(authCb)authCb(null);},
+    /* sign out of this account (or, all=true, every account on this device: used from the lock screen) */
+    signOut:function(all){
+      var ids=all?ACC.list.map(function(x){return x.id;}):[ACC.active],before=ACC.active;
+      var remaining=ACC.list.filter(function(x){return ids.indexOf(x.id)<0;});
+      ids.forEach(function(id){
+        ACCT_KEYS.forEach(function(b){ls(keyFor(b,id),null);});
+        if(remaining.length||id!=='')ls(keyFor('my-lists-gh',id),null);   /* the last, original account keeps its repo name for the form */
+      });
+      keyCache=null;
+      if(!remaining.length){ls(LOCKK,null);ls(FAILK,null);ACC={active:'',list:[{id:'',label:'Account 1'}]};}
+      else{ACC.list=remaining;ACC.active=remaining[0].id;}
+      saveAccts();
+      if(ACC.active!==before){
+        if(!all){try{sessionStorage.setItem('my-lists-switching','1');}catch(e){}}   /* was unlocked: open the other account without the PIN */
+        location.replace(location.pathname);return;
+      }
+      if(authCb)authCb(null);
+    },
     /* resolves null when the file does not exist (at ref), else {state, sha, plain} */
     get:function(ref){
       return req('GET',fileUrl(getCfg())+(ref?'?ref='+encodeURIComponent(ref):'')).then(function(r){
@@ -396,6 +427,7 @@ function startSync(cfg){
 /* ---- app lock (this device only): PIN, optionally fingerprint / face via the device's own authenticator ---- */
 function lockInfo(){return lsJson(LOCKK);}   /* {salt, hash, cred?} */
 var locked=!!lockInfo(), hiddenAt=0, lockErr='', lockBusy=false;
+try{if(sessionStorage.getItem('my-lists-switching')){sessionStorage.removeItem('my-lists-switching');locked=false;}}catch(e){}
 function hashPin(pin,salt64){return deriveBits(pin,u8(salt64),PIN_ITER).then(b64u8);}
 function bioAvailable(){
   try{return window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(function(){return false;}):Promise.resolve(false);}
@@ -419,7 +451,7 @@ function bioCheck(id){
    RFC 8291). A scheduled GitHub Actions job in the public site repo sends due items and removes them, so it
    never sees any task text. The job signs requests with the VAPID private key (an Actions secret). */
 var VAPID_PUBLIC='BDdcvBRLCSQL7V0mDBEHj9jvpbZpWFxblwGv_dAff8L2Bq2S5WZGl-s7f-Fw54A58pAR9pFXM-gYtfKydup_GHE';
-var DEVK='my-lists-device';   /* {id, endpoint} of this device's subscription */
+var DEVK='my-lists-device'+SUF;   /* {id, endpoint} of this device's subscription */
 var push={busy:false, err:'', file:null, run:undefined, runErr:''};
 function b64url(u){return b64u8(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 function unb64url(s){s=String(s).replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';return u8(s);}
@@ -440,7 +472,7 @@ function pushEncrypt(dev,text){
     .then(function(r){return crypto.subtle.importKey('raw',r[0],'AES-GCM',false,['encrypt']).then(function(k){return crypto.subtle.encrypt({name:'AES-GCM',iv:r[1]},k,concatU8(te.encode(text),new Uint8Array([2])));});})
     .then(function(ct){var hdr=new Uint8Array(21);hdr.set(salt,0);new DataView(hdr.buffer).setUint32(16,4096);hdr[20]=65;return b64u8(concatU8(hdr,asPub,new Uint8Array(ct)));});
 }
-function remPath(){return getCfg().path.replace(/[^\/]*$/,'')+'reminders.json';}
+function remPath(){var p=getCfg().path;return ACC.active?p.replace(/\.json$/i,'')+'.reminders.json':p.replace(/[^\/]*$/,'')+'reminders.json';}
 function svcRepo(){var c=getCfg(),seg=location.pathname.split('/').filter(Boolean)[0]||'my-lists';return (defaultOwner()||c.owner)+'/'+seg;}
 function deviceName(){var u=navigator.userAgent;return /iPhone/.test(u)?'iPhone':/iPad/.test(u)?'iPad':/Android/.test(u)?'Android':/Windows/.test(u)?'Windows PC':/Mac/.test(u)?'Mac':'Device';}
 function myDevice(){return lsJson(DEVK);}
@@ -773,6 +805,7 @@ function settingsHtml(){
   h+='<section class="card"><h2>Sound and vibration</h2>'+
      '<label class="row"><input type="checkbox" id="set-sound" data-act="setsound"'+(ls(SNDK)!=='off'?' checked':'')+'> Play a sound when I complete a task</label>'+
      ('vibrate' in navigator?'<label class="row"><input type="checkbox" id="set-vib" data-act="setvib"'+(ls(VIBK)!=='off'?' checked':'')+'> Vibrate when I complete a task (Android)</label>':'')+'</section>';
+  h+=accountsCard();
   h+=remindersCard();
   h+='<section class="card"><h2>App lock</h2>';
   if(lk){
@@ -819,22 +852,69 @@ function settingsHtml(){
   return h;
 }
 
+/* ---- accounts ---- */
+var acctMenu=false, acctRenaming=false;
+function otherCfg(id){return lsJson(keyFor('my-lists-gh',id));}
+function hasToken(id){return !!ls(keyFor('my-lists-token',id));}
+/* switch: let any pending save go out first (max 4 s), then reload as the other account */
+function switchAccount(id){
+  ACC.prev=ACC.active;ACC.active=id;saveAccts();
+  try{sessionStorage.setItem('my-lists-switching','1');}catch(e){}   /* already unlocked: don't ask for the PIN again after the reload */
+  if(pushTimer)pushNow();
+  var t0=Date.now();
+  (function wait(){if(!inflight||Date.now()-t0>4000)location.replace(location.pathname);else setTimeout(wait,100);})();
+}
+function addAccount(){
+  var n=1;while(ACC.list.some(function(x){return x.label==='Account '+n;}))n++;
+  var id='a'+uid();ACC.list.push({id:id,label:'Account '+n});switchAccount(id);
+}
+/* leave a just-added account that never connected */
+function cancelNewAccount(){
+  var me=ACC.active,back=ACC.prev&&ACC.prev!==me&&ACC.list.some(function(x){return x.id===ACC.prev;})?ACC.prev:null;
+  ACC.list=ACC.list.filter(function(x){return x.id!==me;});
+  ls(keyFor('my-lists-gh',me),null);
+  if(!back)back=(ACC.list.find(function(x){return hasToken(x.id);})||ACC.list[0]).id;
+  ACC.prev=null;ACC.active=back;saveAccts();location.replace(location.pathname);
+}
+function canCancelNew(){return ACC.list.length>1&&!hasToken(ACC.active)&&ACC.list.some(function(x){return x.id!==ACC.active&&hasToken(x.id);});}
+function acctBrand(){
+  if(ACC.list.length<2)return '<div class="brand">My Lists</div>';
+  var h='<div class="brand">My Lists <button class="acct" id="acct-btn" data-act="acctmenu" aria-expanded="'+acctMenu+'" aria-label="Switch account">'+esc(curAcct().label)+' ▾</button></div>';
+  if(acctMenu)h+='<div class="acctmenu" id="acct-menu">'+ACC.list.map(function(x){
+      return '<button class="item'+(x.id===ACC.active?' on':'')+'" data-act="acctswitch" data-id="'+esc(x.id)+'"><span class="nm">'+esc(x.label)+'</span></button>';
+    }).join('')+'<button class="item" data-act="acctadd"><span class="nm">+ Add account</span></button></div>';
+  return h;
+}
+function accountsCard(){
+  var h='<section class="card" id="accounts-card"><h2>Accounts</h2><p>Keep separate sets of lists, each with its own repo or file, token and passphrase, and switch between them.</p>'+
+    '<ul class="vers" id="acct-list">'+ACC.list.map(function(x){
+      var c=x.id===ACC.active?getCfg():otherCfg(x.id),where=c?c.owner+'/'+c.repo+' · '+c.path:'not connected';
+      return '<li><span class="when">'+esc(x.label)+(x.id===ACC.active?' (open now)':'')+'<small>'+esc(where)+'</small></span>'+(x.id===ACC.active?'':'<button class="btn" data-act="acctswitch" data-id="'+esc(x.id)+'">Switch</button>')+'</li>';
+    }).join('')+'</ul>';
+  if(acctRenaming)h+='<form data-form="acctrename"><label>Name for this account<input id="acct-name" value="'+esc(curAcct().label)+'" maxlength="40"></label><div class="btns"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" data-act="acctrenameno">Cancel</button></div></form>';
+  else h+='<div class="btns"><button class="btn" data-act="acctrename">Rename this account</button><button class="btn" data-act="acctadd">Add another account</button></div>';
+  return h+'<p class="small">App lock, sound and vibration cover every account on this device. Sign out removes only the account that is open.</p></section>';
+}
 function defaultOwner(){return /\.github\.io$/.test(location.hostname)?location.hostname.split('.')[0]:'';}
 function verHtml(){return '<p class="ver" id="app-version">Version '+APP_VERSION+'</p>';}
 function signOutBit(label){
+  var all=locked&&lockInfo()&&ACC.list.length>1;
   return cloud.confirmOut
-    ?'<p class="hint">'+(isDirty()?'Changes not yet synced will be lost. ':'')+'Signing out removes your lists, token and passphrase key from this device. Your lists stay in GitHub; reconnect with your token and passphrase.</p><div class="btns"><button class="btn danger" type="button" data-act="signoutyes">Sign out</button><button class="btn" type="button" data-act="signoutno">Cancel</button></div>'
+    ?'<p class="hint">'+(isDirty()?'Changes not yet synced will be lost. ':'')+(all?'Signing out removes all '+ACC.list.length+' accounts (lists, tokens and passphrase keys) from this device.':'Signing out removes '+(ACC.list.length>1?'“'+esc(curAcct().label)+'” (its lists, token and passphrase key)':'your lists, token and passphrase key')+' from this device.')+' Your lists stay in GitHub; reconnect with your token and passphrase.</p><div class="btns"><button class="btn danger" type="button" data-act="signoutyes">Sign out</button><button class="btn" type="button" data-act="signoutno">Cancel</button></div>'
     :'<button class="linkbtn" type="button" data-act="signout">'+label+'</button>';
 }
 function authHtml(){
-  var c=getCfg()||{owner:defaultOwner(),repo:'my-lists-data',path:'lists.json'};
+  var multi=ACC.list.length>1,first=otherCfg(ACC.list[0].id)||{};
+  var c=getCfg()||{owner:first.owner||defaultOwner(),repo:first.repo||'my-lists-data',path:multi?'lists-'+(ACC.list.indexOf(curAcct())+1)+'.json':'lists.json'};
   function f(id,label,v){return '<label>'+label+'<input id="'+id+'" value="'+esc(v)+'" autocomplete="off" autocapitalize="off" spellcheck="false" required></label>';}
-  return '<form class="auth" data-form="auth"><h1>My Lists</h1><p>Connect to the private GitHub repo that holds your lists.</p>'+
+  return '<form class="auth" data-form="auth"><h1>'+(multi?'Connect '+esc(curAcct().label):'My Lists')+'</h1><p>Connect to the private GitHub repo that holds '+(multi?'this set of':'your')+' lists.</p>'+
+    (multi?'<label>Name for this account<input id="gh-label" value="'+esc(curAcct().label)+'" maxlength="40" autocomplete="off"></label><p class="hint">Use the same repo with a different file, so the same token works, or a different repo.</p>':'')+
     f('gh-owner','GitHub owner',c.owner)+f('gh-repo','Private repo',c.repo)+f('gh-path','File in the repo',c.path)+
     '<input type="text" name="username" value="my-lists-github" autocomplete="username" hidden>'+
     '<label>Access token<input id="au-pw" type="password" autocomplete="current-password" placeholder="github_pat_…" required></label>'+
     '<div class="err" id="au-err" role="alert">'+esc(cloud.authErr)+'</div>'+
     '<button class="btn primary" type="submit"'+(cloud.busy?' disabled':'')+'>'+(cloud.busy?'Checking…':'Connect')+'</button>'+
+    (canCancelNew()?'<button class="btn" type="button" data-act="acctcancel">Cancel, go back</button>':'')+
     '<p class="hint">Use a fine-grained token that can only see this repo, with Contents: Read and write. It stays on this device.</p>'+verHtml()+'</form>';
 }
 function passHtml(){
@@ -861,17 +941,18 @@ function lockHtml(){
 var drag=null, renderLater=false;
 function render(){
   if(drag){renderLater=true;return;}
+  document.title=ACC.list.length>1?'My Lists · '+curAcct().label:'My Lists';
   var app=document.getElementById('app');
   if(!cloud.user){app.innerHTML=authHtml();var pw=document.getElementById('au-pw');if(pw&&!cloud.busy)pw.focus();return;}
   if(locked&&lockInfo()){app.innerHTML=lockHtml();var lp=document.getElementById('lock-pin');if(lp&&!lockBusy&&!cloud.confirmOut)lp.focus();return;}
   if(cloud.pass){app.innerHTML=passHtml();var p1=document.getElementById('pp1');if(p1&&!cloud.busy&&!cloud.confirmOut)p1.focus();return;}
   var total=S.lists.reduce(function(n,L){return n+openCount(L);},0);
-  app.innerHTML='<aside class="side'+(drawer?' open':'')+'" id="side"><div class="brand">My Lists</div>'+
+  app.innerHTML='<aside class="side'+(drawer?' open':'')+'" id="side">'+acctBrand()+
     '<div class="search"><input id="search" type="search" placeholder="Search all '+total+' tasks" value="'+esc(q)+'" aria-label="Search tasks"></div>'+
     '<nav class="lists"><button class="item duebtn'+(view==='due'&&!q?' on':'')+'" data-act="due"><span class="nm">Due</span><span class="ct'+(hotCount()?' hot':'')+'">'+(hotCount()||'')+'</span></button>'+sideHtml()+'</nav><div class="sidefoot">'+
     (adding?'<form class="newlist" data-form="addlist"><input id="nl-name" placeholder="List name" aria-label="List name" autocomplete="off"><input id="nl-group" list="groups" placeholder="Group (optional)" aria-label="Group" autocomplete="off"><datalist id="groups">'+Object.keys(S.lists.reduce(function(m,L){if(L.group)m[L.group]=1;return m;},{})).map(function(g){return '<option value="'+esc(g)+'">';}).join('')+'</datalist><div style="display:flex;gap:8px"><button class="btn primary" type="submit">Create list</button><button class="btn" type="button" data-act="canceladd">Cancel</button></div></form>':'<button class="btn primary" data-act="addlist">New list</button>')+
     '<div class="pair"><button class="btn" data-act="export">Copy as text</button><button class="btn" data-act="settings">Settings</button></div>'+
-    (cloud.confirmOut?'<button class="btn danger" data-act="signoutyes">'+(isDirty()?'Sign out: unsynced changes will be lost':'Sign out and remove lists from this device')+'</button><button class="btn" data-act="signoutno">Stay signed in</button>':'<button class="btn" data-act="signout">Sign out</button>')+
+    (cloud.confirmOut?'<button class="btn danger" data-act="signoutyes">'+(isDirty()?'Sign out: unsynced changes will be lost':ACC.list.length>1?'Sign out of “'+esc(curAcct().label)+'” on this device':'Sign out and remove lists from this device')+'</button><button class="btn" data-act="signoutno">Stay signed in</button>':'<button class="btn" data-act="signout">Sign out'+(ACC.list.length>1?' of '+esc(curAcct().label):'')+'</button>')+
     '<span class="saved" id="status">'+esc(cloud.status)+'</span>'+verHtml()+'</div></aside>'+
     '<main class="main" id="mainpane">'+mainHtml()+(exportText!==null?'<div class="wrap"><textarea class="export" id="exp" readonly aria-label="All lists as text">'+esc(exportText)+'</textarea></div>':'')+'</main>';
   if(focusNew){var n=document.getElementById('newtask');if(n)n.focus();focusNew=false;}
@@ -953,9 +1034,16 @@ document.addEventListener('click',function(e){
   var a=b.getAttribute('data-act'),id=b.getAttribute('data-id'),lid=b.getAttribute('data-list');
   var L=lid?byId(lid):byId(cur), s0, t;
   if(a==='signout'){cloud.confirmOut=true;render();return;}
+  if(a==='acctmenu'){acctMenu=!acctMenu;render();return;}
+  if(a==='acctswitch'){if(id!==ACC.active)switchAccount(id);else{acctMenu=false;render();}return;}
+  if(a==='acctadd'){addAccount();return;}
+  if(a==='acctcancel'){cancelNewAccount();return;}
+  if(a==='acctrename'){acctRenaming=true;render();var an=document.getElementById('acct-name');if(an){an.focus();an.select();}return;}
+  if(a==='acctrenameno'){acctRenaming=false;render();return;}
   if(a==='signoutno'){cloud.confirmOut=false;render();return;}
   if(a==='signoutyes'){
-    var finish=function(){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;clearTimeout(remTimer);S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;view='lists';cloud.status='';cloud.needImport=false;cloud.pass=null;cloud.offerWipe=false;locked=false;lockErr='';sett.hist=null;sett.prev=null;push.file=null;hideToast();window.Cloud.signOut();};
+    var outAll=!!(locked&&lockInfo());   /* forgot the PIN: sign out of every account, or the lock could be bypassed */
+    var finish=function(){cloud.confirmOut=false;clearTimeout(pushTimer);pushTimer=null;clearTimeout(remTimer);S={rev:0,lists:[]};cur=undefined;q='';editing=null;exportText=null;view='lists';cloud.status='';cloud.needImport=false;cloud.pass=null;cloud.offerWipe=false;locked=false;lockErr='';sett.hist=null;sett.prev=null;push.file=null;hideToast();window.Cloud.signOut(outAll);};
     var me=myDevice();
     if(me&&cloud.user&&getKeyInfo()&&!cloud.pass){   /* stop notifications to this device first (best effort, max 5 s) */
       b.disabled=true;b.textContent='Signing out…';
@@ -1038,6 +1126,10 @@ document.addEventListener('submit',function(e){
     var tok=document.getElementById('au-pw').value.trim();
     var cfg={owner:document.getElementById('gh-owner').value.trim(),repo:document.getElementById('gh-repo').value.trim(),path:document.getElementById('gh-path').value.trim().replace(/^\/+/,'')};
     if(!tok||!cfg.owner||!cfg.repo||!cfg.path)return;
+    var lab=document.getElementById('gh-label');
+    if(lab&&lab.value.trim()){curAcct().label=lab.value.trim().slice(0,40);saveAccts();}
+    var dup=ACC.list.find(function(x){var o=otherCfg(x.id);return x.id!==ACC.active&&hasToken(x.id)&&o&&o.owner.toLowerCase()===cfg.owner.toLowerCase()&&o.repo.toLowerCase()===cfg.repo.toLowerCase()&&o.path===cfg.path;});
+    if(dup){cloud.authErr='That file already belongs to your account “'+dup.label+'”. Use a different file name or repo.';ls(GHK,JSON.stringify(cfg));render();return;}
     cloud.busy=true;cloud.authErr='';render();
     window.Cloud.signIn(tok,cfg).then(function(){cloud.busy=false;}).catch(function(err){
       cloud.busy=false;var c=(err&&err.code)||'';
@@ -1079,6 +1171,7 @@ document.addEventListener('submit',function(e){
     hashPin(pin,lk.salt).then(function(hh){lockBusy=false;if(hh===lk.hash)unlock();else{lockFail();render();}});
     return;
   }
+  if(f==='acctrename'){var nm=document.getElementById('acct-name').value.trim();if(nm){curAcct().label=nm.slice(0,40);saveAccts();}acctRenaming=false;render();return;}
   if(f==='setpin'){
     var a1=document.getElementById('pin1').value,a2=document.getElementById('pin2').value;
     if(!/^\d{4,}$/.test(a1)){sett.pinErr='Use 4 or more digits.';render();return;}
